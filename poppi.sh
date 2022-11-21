@@ -11,7 +11,6 @@
 set -o pipefail
 
 __init_logfile() {
-    readonly _LOG_FILE="${_BASE_DIR}/poppi.log"
     local bool_created_logfile
 
     # no file? create it
@@ -39,20 +38,25 @@ __init_logfile() {
     fi
 }
 
-_init_vars() {
+__init_vars() {
     # set initial variables  
-    readonly _BASE_DIR=$(pwd -P)		                 # base directory path
+    readonly _BASE_DIR=$(pwd -P)		                 # script directory
     readonly _EXEC_START=$(date +%s)		             # script launch time
+    readonly _LOG_FILE="${_BASE_DIR}/poppi.log"          # log file
     readonly _OS="Pop!_OS"
     readonly _OS_RELEASE_FILE="/etc/os-release"
     readonly _SCRIPT=$(basename "$0")		             # this script
-    readonly _USER_HOME=$(eval echo ~${SUDO_USER})       # user home directory
-    readonly _USER_NAME=$(eval echo ${SUDO_USER})        # user name
-    readonly _USER_ID=$(id -u ${_USER_NAME})             # user login id
+    readonly _USER_NAME=$(logname)                       # user name
+    readonly _USER_HOME=$(echo "/home/${_USER_NAME}")    # user home directory
+    readonly _USER_ID=$(id -u "${_USER_NAME}")           # user login id
     readonly _USER_SESSION="DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${_USER_ID}/bus"
+    readonly _APPSDIR="${_USER_HOME}/Portables"
+    readonly _BASHRC="${_USER_HOME}/.bashrc"
+    readonly _PROFILE="${_USER_HOME}/.profile"
+    readonly _BOOKMARKS="${_USER_HOME}/.config/gtk-3.0/bookmarks"
+    readonly _USER_APPS="${_USER_HOME}/.local/share/applications"
+    readonly _USER_ICONS="${_USER_HOME}/.local/share/icons/hicolor/scalable/apps"
     readonly _VERSION="1.0"					             # script version
-    readonly _APPSDIR=${_USER_HOME}/Portables
-    readonly _BOOKMARKS=${_USER_HOME}/.config/gtk-3.0/bookmarks
 
     # display colours
     readonly _COLOR_GRAY=$'\e[38;5;245m'
@@ -146,26 +150,38 @@ check_user() {
 display_usage() {
     cat <<EOF
 ${_COLOR_GRAY}
-A set of post-installation routines tested on Pop!_OS 22.04 LTS.
+A set of post-installation methods tested on Pop!_OS 22.04 LTS.
 
   ${_COLOR_NC}USAGE:${_COLOR_GRAY}
   [sudo] ./${_SCRIPT} [OPTION]
 
   ${_COLOR_NC}OPTIONS:${_COLOR_GRAY}
-  -v,  --version      Display version info.
-  -h,  --help         Display this help message.
-  --no-version-check  Skip checking for the latest version of the script.
+  -h, --help                Display this help message.
+  -p, --install-portables   Install/update portable applications (AppImages, etc).
+  -v, --version             Display version info.
 
   ${_COLOR_NC}LOGS:${_COLOR_GRAY}
-  --debug             Print debug level logs.
-  --trace             Print trace level logs.
+  --debug                   Print debug level logs.
+  --trace                   Print trace level logs.
 
   ${_COLOR_NC}DOCUMENTATION & BUGS:${_COLOR_GRAY}
-  Report bugs to      https://github.com/simurqq/poppi/issues
-  Documentation       https://github.com/simurqq/poppi
-  License             GPLv3
+  Report bugs to:           https://github.com/simurqq/poppi/issues
+  Documentation:            https://github.com/simurqq/poppi
+  License:                  GPLv3
 ${_COLOR_NC}
 EOF
+}
+
+dotfiles() {
+    # add directory 'Portables' to $PATH
+    if [[ -d ${_APPSDIR} ]] && [[ -f ${_PROFILE} ]]; then
+        str_prt1=$(grep "^export PATH=\$PATH:$_APPSDIR" "${_PROFILE}")
+        str_prt2=$(grep "^export PATH=\$PATH:\$HOME\/Portables" "${_PROFILE}")
+        [[ -z $str_prt1 ]] && [[ -z $str_prt2 ]] && printf "\n%s\n" "export PATH=\$PATH:\$HOME/Portables" >> ${_PROFILE} && \
+        log_message "Added ${_APPSDIR} to \$PATH" 1 || log_message "Directory ${_APPSDIR} already in \$PATH"
+    fi
+
+    source ${_PROFILE}
 }
 
 fetch_portable_urls(){
@@ -241,7 +257,7 @@ install_dependencies() {
                 log_message "Dependency package '${i}' found"
             else
                 apt -q -y --no-install-recommends install "${i}" 2>&1 | log_trace "(PCK)"
-                if [ $? -eq 0 ]; then
+                if [[ $? -eq 0 ]]; then
                     log_message "Dependency package '${i}' installed" 1
                 else
                     log_and_exit "Failed to install dependency package '${i}'.
@@ -253,16 +269,11 @@ install_dependencies() {
 
 install_portables(){
     # Audacity | CPU-X | DeadBeef | HW-Probe | Inkscape | KeepassXC | Neofetch
-    # QBittorrent | SMPlayer | SQLite Browser | VSCodium | YT-DLP
+    # QBittorrent | SMPlayer | SQLite Browser | Styli.sh | VSCodium | YT-DLP
     
-    # TODO: 
-    # permissions
-    # .desktop files
-    # .config files
+    local counter filename name total url 
 
-    local url filename
-
-    # create directory and add assoc. bookmark to Nautilus    
+    # create directory for portables and bookmark it to Nautilus
     if [ ! -d ${_APPSDIR} ]; then 
         if ! mkdir -p "${_APPSDIR}"; then
             log_and_exit "Failed to create directory ${_APPSDIR}" "25"
@@ -271,7 +282,7 @@ install_portables(){
             if [ -f $_BOOKMARKS ]; then
                 grep -q "file://${_APPSDIR}" ${_BOOKMARKS}
                 if [ $? -eq 1 ]; then
-                    printf %s "file://${_APPSDIR}" >> $_BOOKMARKS
+                    printf "%s" "file://${_APPSDIR}" >> $_BOOKMARKS
                     log_message "Bookmarked folder ${_APPSDIR}" 1
                 else
                     log_message "Bookmark for directory ${_APPSDIR} exists"
@@ -286,164 +297,195 @@ install_portables(){
 
     log_message "Initialising download of portables. Please wait..."
 
-## .:. AUDACITY .:.
+# .:. AUDACITY .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/audacity/audacity/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4)"
-    # filename="audacity-latest.AppImage"
+    url="$(curl -sfL 'https://api.github.com/repos/audacity/audacity/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4)"
+    filename="audacity"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download Audacity. Skipping..." 3
-    # fi
+    if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download Audacity. Skipping..." 3
+    fi
 
-## .:. CPU-X .:.
+# .:. CPU-X .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/X0rg/CPU-X/releases/latest' | grep "browser_download_url.*AppImage\"" | cut -d \" -f 4)"
-    # filename="cpux-latest.AppImage"
+    url="$(curl -sfL 'https://api.github.com/repos/X0rg/CPU-X/releases/latest' | grep "browser_download_url.*AppImage\"" | cut -d \" -f 4)"
+    filename="cpux"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download CPU-X. Skipping..." 3
-    # fi
+    if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download CPU-X. Skipping..." 3
+    fi
 
-##D .:. DEADBEEF .:.
+# .:. DEADBEEF .:.
 
-    # url="$(curl -sfL 'https://deadbeef.sourceforge.io/download.html' | grep "GNU.*sourceforge.*tar.bz2/download" | cut -d \" -f 2)"
-    # filename="deadbeef-latest.tar.bz2"
+    url="$(curl -sfL 'https://deadbeef.sourceforge.io/download.html' | grep "GNU.*sourceforge.*tar.bz2/download" | cut -d \" -f 2)"
+    filename="deadbeef"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download Deadbeef. Skipping..." 3
-    # fi
+    if [[ $url =~ https\:\/\/.*\.tar.bz2 ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download Deadbeef. Skipping..." 3
+    fi
 
-    # extDir=$(tar -jtf "${_APPSDIR}/$filename" | head -1 | cut -d "/" -f 1)
-    # tar -jxf "${_APPSDIR}/$filename" -C "${_APPSDIR}"
-    # mv "${_APPSDIR}/$extDir" "${_APPSDIR}/deadbeef-latest"
-    # rm "${_APPSDIR}/$filename"
+    # extract the contents of the downloaded tar file
+    if [[ -f "${_APPSDIR}/${filename}" ]]; then  
+        xDir=$(tar -jtf "${_APPSDIR}/$filename" | head -1 | cut -d "/" -f 1)
+        tar -jxf "${_APPSDIR}/$filename" -C "${_APPSDIR}"
+        rm "${_APPSDIR}/$filename"
+        mv "${_APPSDIR}/$xDir" "${_APPSDIR}/deadbeef"
+    else
+        log_message "File ${filename} does not exist" 3
+    fi
 
-## .:. HW-PROBE .:.
+# .:. HW-PROBE .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/linuxhw/hw-probe/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4 | sort | tail -1)"
-    # filename="hw-probe-latest.AppImage"
+   url="$(curl -sfL 'https://api.github.com/repos/linuxhw/hw-probe/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4 | sort | tail -1)"
+   filename="hwprobe"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download HW-Probe. Skipping..." 3
-    # fi
+   if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+       fetch_portable_urls $url $filename
+   else
+       log_message "Failed to download HW-Probe. Skipping..." 3
+   fi
 
-## .:. INKSCAPE .:.
+# .:. INKSCAPE .:.
 
-    # url="$(curl -sfL 'https://inkscape.org/release/all/gnulinux/appimage' | grep ".*\AppImage<" | cut -d \" -f 2 | tail -1 | sed 's/^/https:\/\/inkscape\.org/')"
-    # filename="inkscape-latest.AppImage"
+   url="$(curl -sfL 'https://inkscape.org/release/all/gnulinux/appimage' | grep ".*\AppImage<" | cut -d \" -f 2 | tail -1 | sed 's/^/https:\/\/inkscape\.org/')"
+   filename="inkscape"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download Inkscape. Skipping..." 3
-    # fi
+   if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+       fetch_portable_urls $url $filename
+   else
+       log_message "Failed to download Inkscape. Skipping..." 3
+   fi
 
-## .:. KEEPASSXC .:.
+# .:. KEEPASSXC .:.
 
-    # url="$(curl -sfL 'https://keepassxc.org/download/#linux' | grep "AppImage\"" | cut -d \" -f 2)"
-    # filename="keepassxc-latest.AppImage"
+   url="$(curl -sfL 'https://keepassxc.org/download/#linux' | grep "AppImage\"" | cut -d \" -f 2)"
+   filename="keepassxc"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download KeePass-XC. Skipping..." 3
-    # fi
+   if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+       fetch_portable_urls $url $filename
+   else
+       log_message "Failed to download KeePass-XC. Skipping..." 3
+   fi
 
-## .:. NEOFETCH .:.
+# .:. NEOFETCH .:.
 
     url="https://raw.githubusercontent.com/dylanaraps/neofetch/master/neofetch"
-    filename="neofetch-latest.sh"
+    filename="neofetch"
 
-    if [ ! -z $url ]; then
+    if [[ $url =~ https\:\/\/.*\\/neofetch ]]; then
         fetch_portable_urls $url $filename
     else
         log_message "Failed to download Neofetch. Skipping..." 3
     fi
-## .:. QBITTORRENT .:.
 
-   # url="$(curl -sfL 'https://www.qbittorrent.org/download.php' | grep -P ".*sourceforge.*\d_x86_64\.AppImage\/download" | cut -d \" -f 4 | head -1)"
-   # filename="qbittorrent-latest.AppImage"
-   # 
-   # # needs more elegant solution to check for `curl` output
-   # if [ ! -z $url ]; then
-   #     fetch_portable_urls $url $filename
-   # else
-   #     log_message "Failed to download QBittorrent. Skipping..." 3
-   # fi
+# .:. QBITTORRENT .:.
 
-## .:. SMPLAYER .:.
-
-    # url="$(curl -sfL 'https://api.github.com/repos/smplayer-dev/smplayer/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4)"
-    # filename="smplayer-latest.AppImage"
+    url="$(curl -sfL 'https://www.qbittorrent.org/download.php' | grep -P ".*sourceforge.*\d_x86_64\.AppImage\/download" | cut -d \" -f 4 | head -1)"
+    filename="qbittorrent"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download SMPlayer. Skipping..." 3
-    # fi
+  
+     if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+         fetch_portable_urls $url $filename
+     else
+         log_message "Failed to download SMPlayer. Skipping..." 3
+     fi
 
-## .:. SQLITE BROWSER .:.
+# .:. SQLITE BROWSER .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/sqlitebrowser/sqlitebrowser/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4)"
-    # filename="sqlitebrowser-latest.AppImage"
+     url="$(curl -sfL 'https://api.github.com/repos/sqlitebrowser/sqlitebrowser/releases/latest' | grep "browser_download_url.*AppImage" | cut -d \" -f 4)"
+     filename="sqlitebrowser"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download SQLite Browser. Skipping..." 3
-    # fi
+     if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+         fetch_portable_urls $url $filename
+     else
+         log_message "Failed to download SQLite Browser. Skipping..." 3
+     fi
 
-## .:. VSCODIUM .:.
+# .:. STYLI.SH .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/VSCodium/vscodium/releases/latest' | grep "browser_download_url.*AppImage\"" | cut -d \" -f 4)"
-    # filename="vscodium-latest.AppImage"
+    url="https://raw.githubusercontent.com/thevinter/styli.sh/master/styli.sh"
+    filename="styli.sh"
+
+    if [[ $url =~ https\:\/\/.*\.sh ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download Styli.sh. Skipping..." 3
+    fi
+
+# .:. VSCODIUM .:.
+
+    url="$(curl -sfL 'https://api.github.com/repos/VSCodium/vscodium/releases/latest' | grep "browser_download_url.*AppImage\"" | cut -d \" -f 4)"
+    filename="vscodium"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download VSCodium. Skipping..." 3
-    # fi
+    if [[ $url =~ https\:\/\/.*\.AppImage ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download VSCodium. Skipping..." 3
+    fi
 
-## .:. YT-DLP .:.
+# .:. YT-DLP .:.
 
-    # url="$(curl -sfL 'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest' | grep "browser_download_url.*\/yt-dlp\"" | cut -d \" -f 4)"
-    # filename="ytdlp-latest"
+    url="$(curl -sfL 'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest' | grep "browser_download_url.*\/yt-dlp\"" | cut -d \" -f 4)"
+    filename="ytdlp"
     
-    # # needs more elegant solution to check for `curl` output
-    # if [ ! -z $url ]; then
-    #     fetch_portable_urls $url $filename
-    # else
-    #     log_message "Failed to download YT-DLP. Skipping..." 3
-    # fi
+    if [[ $url =~ https\:\/\/.*\/yt-dlp ]]; then
+        fetch_portable_urls $url $filename
+    else
+        log_message "Failed to download YT-DLP. Skipping..." 3
+    fi
 
-    # add .desktop and config files to select programs
+    # copy .desktop files
+    total=$(ls ${_BASE_DIR}/data/launchers/* | wc -l)
+    counter=0
 
-# Exec=/home/vna-pc/Programs/Audacity.AppImage %F
-# Exec and Icon fields
-# Icon=${SNAP}/usr/share/icons/hw-probe.png
+    for f in ${_BASE_DIR}/data/launchers/*
+    do
+        if [[ -f $f ]]; then
+            name=$(basename $f)
+            cp $f $_USER_APPS
+            chown ${_USER_ID}:${_USER_NAME} ${_USER_APPS}/${name} && chmod 774 ${_USER_APPS}/${name}    # set ownership and X permission to copied files only
+            [[ $?==0 ]] && [[ -f ${_USER_APPS}/${name} ]] && \
+            ((counter++)) || ffailed=$(printf "%s," ${_USER_APPS}/${name} | sed 's/,$//')               # remove last comma in string
+        fi
+    done
+    
+    if [[ $counter == $total ]]; then
+        log_message "All desktop entries copied to $_USER_APPS and set X permissions OK" 1
+    else
+        log_message "Failed to copy and set X permissions for: $ffailed" 3
+    fi
+    
+    # copy icon files
+    total=$(ls ${_BASE_DIR}/data/icons/* | wc -l)
+    counter=0
 
-    # set user and group permissions
-    chown -R ${_USER_ID}:${_USER_NAME} $_APPSDIR && \
-    chmod -R 775 $_APPSDIR && \
-    log_message "Permissions set for directory ${_APPSDIR} @ user ${_USER_NAME}" 1 || \
-    log_message "Failed to set permissions for directory ${_APPSDIR}" 3
+    for f in ${_BASE_DIR}/data/icons/*
+    do
+        name=$(basename $f)
+        cp $f $_USER_ICONS
+        chown ${_USER_ID}:${_USER_NAME} ${_USER_ICONS}/${name} && chmod 664 ${_USER_ICONS}/${name}      # set ownership and RW permission to copied files only
+        [[ $?==0 ]] && [[ -f ${_USER_ICONS}/${name} ]] && \
+        ((counter++)) || ffailed=$(printf "%s," ${_USER_ICONS}/${name} | sed 's/,$//')                  # remove last comma in string
+    done
+    
+    if [[ $counter == $total ]]; then
+        log_message "All icon files copied to $_USER_ICONS OK" 1
+    else
+        log_message "Failed to copy files: $ffailed" 3
+    fi
+
+    # set user and group permissions to the portables directory 
+    chown -R ${_USER_ID}:${_USER_NAME} ${_APPSDIR} && \
+    chmod -R 774 ${_APPSDIR} && \
+    log_message "User ${_USER_NAME} granted RWX permissions for ${_APPSDIR}" 1 || \
+    log_message "Failed to set permissions for ${_APPSDIR}" 3
+
 }
 
     # Brave pre-requisites: https://brave.com/linux/
@@ -610,7 +652,7 @@ system_update(){
         log_message "System update complete" 1
         screen_lock_status
     else
-        log_message "System update failed and exited with error code: ${_EXIT_CODE}
+        log_message "System update failed and exited with error code: $?
         [1] This might be due to either missing keys or wrongly configured repositories, or
         [2] Repositories unavailable for your version of release.
         Script cannot proceed with this error." 2
@@ -653,9 +695,10 @@ main(){
     #system_update
     #install_dependencies
     install_portables
-    #install_debs
+    #install_repos
     #miscops
     #set_gsettings
+    dotfiles
  }
 
 # Launchpad
