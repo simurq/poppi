@@ -22,8 +22,8 @@ __init_logfile() {
         fi
     fi
 
-    # check if log file can be written
-    if [[ -w $_LOG_FILE ]]; then
+    # check if log file is writable
+    if [[ -w ${_LOG_FILE} ]]; then
         if touch "${_LOG_FILE}"; then
             _FILELOGGER_ACTIVE="true"
             [[ $bool_created_logfile == "true" ]] && log_message "Created log file: ${_LOG_FILE}" 1
@@ -120,7 +120,7 @@ __logger_core() {
     if [[ $lvl_console -eq 1 ]]; then
         printf "%s%s%s %s %s\n" "${lvl_color}" "${lvl_prefix}" "${lvl_sym}" "${lvl_msg}" "${lvl_nc}"
     else
-        # for progress reports on the same line (note '\r'). strlen=100 to provide enough space to mask overwritten messages
+        # for progress reports on the same line ('\r'). strlen=100 to provide enough space to mask overwritten messages
         printf "%s%s%s %-100s %s\r" "${lvl_color}" "${lvl_prefix}" "${lvl_sym}" "${lvl_msg}" "${lvl_nc}"
     fi
 
@@ -132,10 +132,10 @@ __logger_core() {
 check_internet() {
     log_message "Checking connectivity..."
     if ping -c 4 -i 0.2 google.com 2>&1 | log_trace "(WEB)"; then
-        log_message "Connected to the Internet." 1
+        log_message "Connected to the Internet" 1
     else
         log_and_exit "You are not connected to the Internet.
-    Please check your connection and try again." "14"
+    Please check your connection and try again" "14"
     fi
 }
 
@@ -187,14 +187,16 @@ dotfiles() {
 fetch_portable_urls(){
     # https://v.gd/curl_progress_bash
 
-    local attempt content_length filesize http_code percentage
+    local attempt bool_nofile bool_update content_length filesize http_code percentage
 
     attempt=1             # max no. of tries to get HTTP response before breaking the loop == 5
+    bool_nofile=0         # local file availablity status
+    bool_update=0         # local file update status
     content_length=0      # reported total file size
-    filesize=0            # actual file size on disk
     http_code=0           # 200 == file exists
     percentage=0          # percentage of completed download
 
+    # check remote file status
     while [ "$http_code" == 0 ] && [ "$content_length" == 0 ]
     do
         http_code=$(curl -sIL -w '%{http_code}' "${1}" -o /dev/null)
@@ -204,10 +206,24 @@ fetch_portable_urls(){
         (( attempt++ )) && (( attempt == 5 )) && break
     done
 
-    if [ "$http_code" == 200 ]; then
+    # check local file status
+    if [ -f "${_APPSDIR}/${2}" ]; then
+        filesize=$(wc -c "${_APPSDIR}/${2}" | cut -d " " -f 1)
+        [[ $filesize != $content_length ]] && bool_update=1 && \
+        log_message "Newer version of '${2}' is available. Downloading..."
+    else
+        bool_nofile=1
+    fi
+
+    # download file only if at least two of these conditions met:
+    # http code == 200   -> file exists on remote server
+    # bool_nofile == 1   -> file doesn't exist on local computer
+    # bool_update == 1   -> newer version of file available
+    if [ "$http_code" == 200 ] && ([[ $bool_nofile == 1 ]] || [[ $bool_update == 1 ]]); then
         curl -sfL --output-dir "${_APPSDIR}" "${1}" -o "${2}" |
         while [ "$filesize" != "$content_length" ]
         do
+            # wait until some portion of file written onto disk
             if [ -f "${_APPSDIR}/${2}" ]; then
                 filesize=$(stat -c "%s" ${_APPSDIR}/${2})
                 percentage=$(printf "%d" "$((100*$filesize/$content_length))")
@@ -220,7 +236,7 @@ fetch_portable_urls(){
         filesize=$(stat -c "%s" ${_APPSDIR}/${2})
         [ "$filesize" -eq "$content_length" ] && log_message "Download complete for ${2}" 1 || log_message "Download incomplete for ${2}" 3
     else
-        log_message "File '${2}' not found! Skipping download..." 3
+        log_message "Skipping download for '${2}'..."
     fi
 }
 
@@ -295,7 +311,7 @@ install_portables(){
         log_message "Directory ${_APPSDIR} exists"
     fi
 
-    log_message "Initialising download of portables. Please wait..."
+    log_message "Initialising download of portables. Please wait..." 4
 
 # .:. AUDACITY .:.
 
@@ -690,10 +706,10 @@ main(){
     __init_logfile
     log_message "Permission checks"
     check_user
-    #check_internet
-    #system_check
+    check_internet
+    system_check
     #system_update
-    #install_dependencies
+    install_dependencies
     install_portables
     #install_repos
     #miscops
