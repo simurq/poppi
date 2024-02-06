@@ -1,3 +1,4 @@
 .vscode/
 data/
 test-poppi.sh
+*.log
