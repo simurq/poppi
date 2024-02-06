@@ -5,26 +5,35 @@
 # Github repository:    	https://github.com/simurqq/poppi                                                #
 # License:              	GPLv3                                                                           #
 # Author:               	Victor Quebec                                                                   #
-# Date:                 	Jan 24, 2024                                                                    #
+# Date:                 	Feb 5, 2024                                                                    #
 # Requirements:             Bash v4.2 and above                                                             #
 #                           coreutils, jq, yasm                                                             #
 # Notes:                    - commands marked with '#!#' (without single quotes) are customisable           #
 #                           - check `main()` for the order of functions run upon script's Initialisation    #
 #############################################################################################################
 
-# shellcheck disable=SC2001
+# shellcheck disable=SC2010
 
 SECONDS=0
 
 set -o pipefail # info: https://gist.github.com/simurq/38fadad2ce76ac6cdd62e38dec9e3da8
 
 __init_logfile() {
-    # Description:      creates a plain text file 'poppi.log' in the script location to record program and system reports
+    # Description:      creates a plain text file 'poppi.log' in the script location to record program and system reports,
+    #                   backs up no more than five (5) such logs timestamped
+    # Arguments:        none
 
     local bool_created_logfile
 
-    if [[ -f "$_LOGFILE"'.log' ]]; then
-        mv "$_LOGFILE"'.log' "$_LOGFILE"'_'"$(date +'%d%m%Y_%H%M%S')"'.log' 2>&1 | log_trace "LGF" # back up the existing file
+    if [ -f "$_LOGFILE"'.log' ]; then
+        total_logs=$(ls -l "$_LOGFILE"_*.log 2>/dev/null | grep -c "^\-") # total log files
+
+        if [[ $total_logs -ge 5 ]]; then                                                                                         # keep no more than 5 logs
+            oldlog=$(find . -type f -name "$(basename "${_LOGFILE}")_*" -printf "%T@ %p\n" | sort -n | head -1 | cut -f2- -d" ") # locate the oldest log
+            rm "$oldlog" 2>&1 | log_trace "(LGF)"                                                                                # FIFO rulez!
+        fi
+
+        mv "$_LOGFILE"'.log' "$_LOGFILE"'_'"$(date +'%d%m%Y_%H%M%S')"'.log' 2>&1 | log_trace "(LGF)" # back up the existing file
     fi
 
     # no log? create it
@@ -36,7 +45,7 @@ __init_logfile() {
         fi
     fi
 
-    # check if log file is writable and exit the script, if not
+    # check if the log file is writable and exit, if not
     if [[ -w "$_LOGFILE"'.log' ]]; then
         if touch "$_LOGFILE"'.log' 2>&1 | log_trace "(LGF)"; then
             _FILELOGGER_ACTIVE="true"
@@ -82,7 +91,7 @@ __init_vars() {
     _USERAPPS="$_USERHOME"/.local/share/applications                 # .desktop launchers for portable programs
     _USERICONS="$_USERHOME"/.local/share/icons/hicolor/scalable/apps # icons for portable programs
     _GTKEXTS="$_USERHOME"/.local/share/gnome-shell/extensions        # default location for GNOME extensions
-    _VERSION="1.0"                                                   # script version
+    _VERSION="0.9"                                                   # script version
     _WALLPPR="$_USERHOME"/Pictures/Wallpapers                        # user's wallpaper directory
 
     # display colours
@@ -620,7 +629,7 @@ misc_automount_drives() {
                         { echo "UUID=$uuid /mnt/$drv auto nosuid,nodev,nofail,x-gvfs-show 0 0" | sudo tee -a /etc/fstab; } >/dev/null 2>&1 | log_trace "(MSC)" &&
                             # echo "/dev/disk/by-uuid/$uuid /mnt/$device_name auto nosuid,nodev,nofail,x-gvfs-show 0 0" | sudo tee -a /etc/fstab
                             echo "file:///mnt/$drv $drv" >>"$_GTKBKMRK" &&
-                            bool_drv_bookmarked='true' &&
+                            bool_drv_bookmarked='true' && # TODO: adjust the logic to retain the variable's value for multiple drives
                             log_message "External drive '$drv' mounted and bookmarked"
                     else
                         log_message "External drive '$drv' auto-mounts anyway. Skipping ..."
@@ -1791,6 +1800,7 @@ tar_extractor() {
     done
 }
 
+# shellcheck disable=SC2001
 trimex() {
     # clean the string with extension name as much as possible
     # TODO: consider occasions when extension's ID indeed starts with '@' or similar'. Such extensions usually have IDs in manifest.json
@@ -1800,15 +1810,15 @@ trimex() {
     val="${1}"
 
     if [[ "$val" =~ ^[@#\&$]* ]]; then
-        val=$(sed 's:^[@#&$]*::' <<<"$val")
+        val=$(sed 's/^[@#&$]//' <<<"$val")
     fi
 
     if grep -o "\{.*\}" <<<"${val}" >/dev/null; then
-        val=$(sed 's:{}::g' <<<"$val")
+        val=$(sed 's/{}//g' <<<"$val")
     fi
 
     if grep -o "0Y0" <<<"${val}" >/dev/null; then
-        val=$(sed 's:0Y0::' <<<"$val")
+        val=$(sed 's/0Y0//' <<<"$val")
     fi
 
     echo "$val"
