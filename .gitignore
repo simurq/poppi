@@ -1,4 +1,4 @@
 .vscode/
 data/
-test-poppi.sh
+*.code-workspace
 *.log
