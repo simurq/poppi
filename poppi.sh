@@ -5,16 +5,17 @@
 # Github repository:    	https://github.com/simurqq/poppi                                                #
 # License:              	GPLv3                                                                           #
 # Author:               	Victor Quebec                                                                   #
-# Date:                 	Feb 5, 2024                                                                    #
+# Date:                 	Feb 5, 2024                                                                     #
 # Requirements:             Bash v4.2 and above                                                             #
-#                           coreutils, jq, yasm                                                             #
+#                           coreutils, jq, python3-pip, yasm                                                #
 # Notes:                    - commands marked with '#!#' (without single quotes) are customisable           #
-#                           - check `main()` for the order of functions run upon script's Initialisation    #
+#                           - check functions main() and all() for the order of functions run upon          #
+#                             script's initialisation                                                       #
 #############################################################################################################
 
 # shellcheck disable=SC2010
 
-SECONDS=0
+SECONDS=0 # set the timer
 
 set -o pipefail # info: https://gist.github.com/simurq/38fadad2ce76ac6cdd62e38dec9e3da8
 
@@ -79,20 +80,20 @@ __init_vars() {
     _USERNAME=$(whoami)                                                                # user name
     _USERHOME="/home/$_USERNAME"                                                       # user home directory
     _USERID=$(id -u "$_USERNAME")                                                      # user login id
-    _USERSESSION="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${_USERID}/bus"
-    _APPSDIR="$_USERHOME/Portables" # location of portable programs
-    _BASHRC="$_USERHOME"/.bashrc
-    _GTKBKMRK="$_USERHOME"/.config/gtk-3.0/bookmarks
-    _FFXADDONSURL="https://addons.mozilla.org/addon" # main website to download Firefox addons
-    _FFXAPPINI="/usr/lib/firefox/application.ini"
-    _FFXCHANNEL="/usr/lib/firefox/defaults/pref/channel-prefs.js"
-    _FFXDIR="$_USERHOME/.mozilla/firefox"
-    _PROFILE="$_USERHOME"/.profile
-    _USERAPPS="$_USERHOME"/.local/share/applications                 # .desktop launchers for portable programs
-    _USERICONS="$_USERHOME"/.local/share/icons/hicolor/scalable/apps # icons for portable programs
-    _GTKEXTS="$_USERHOME"/.local/share/gnome-shell/extensions        # default location for GNOME extensions
-    _VERSION="0.9"                                                   # script version
-    _WALLPPR="$_USERHOME"/Pictures/Wallpapers                        # user's wallpaper directory
+    _USERSESSION="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${_USERID}/bus"         # user session, useful for crontab operations
+    _APPSDIR="$_USERHOME/Portables"                                                    # location of portable programs
+    _BASHRC="$_USERHOME"/.bashrc                                                       # user settings updated with every new shell session
+    _GTKBKMRK="$_USERHOME"/.config/gtk-3.0/bookmarks                                   # directory bookmarks on Files/Nautilus
+    _FFXADDONSURL="https://addons.mozilla.org/addon"                                   # external server to download Firefox addons
+    _FFXAPPINI="/usr/lib/firefox/application.ini"                                      # some Firefox settings
+    _FFXCHANNEL="/usr/lib/firefox/defaults/pref/channel-prefs.js"                      # Firefox channel info
+    _FFXDIR="$_USERHOME/.mozilla/firefox"                                              # Firefox profile directory
+    _PROFILE="$_USERHOME"/.profile                                                     # user profile directory (requires computer restart)
+    _USERAPPS="$_USERHOME"/.local/share/applications                                   # .desktop launchers for portable programs
+    _USERICONS="$_USERHOME"/.local/share/icons/hicolor/scalable/apps                   # icons for portable programs
+    _GTKEXTS="$_USERHOME"/.local/share/gnome-shell/extensions                          # default location for GNOME extensions
+    _VERSION="0.9.1"                                                                   # script version
+    _WALLPPR="$_USERHOME"/Pictures/Wallpapers                                          # custom wallpaper directory
 
     # display colours
     _CGRAY=$'\e[38;5;245m'
@@ -103,8 +104,8 @@ __init_vars() {
     _CNONE=$'\e[0m'
 
     # miscellaneous
-    bool_drv_bookmarked='false'   # mounted drive status in /etc/fstab
-    _FILELOGGER_ACTIVE="false"    # log file status
+    bool_drv_bookmarked=false     # mounted drive status in /etc/fstab
+    _FILELOGGER_ACTIVE=false      # log file status
     _FFXPRF=""                    # Firefox default profile directory
     _isLOCKED=0                   # screenlock status
     _SCREENLOCK=0                 # screenlock period of inactivity
@@ -230,11 +231,11 @@ ${_CGRAY}
 A set of post-installation methods tested on Pop!_OS 22.04 LTS.
 
   ${_CNONE}USAGE:${_CGRAY}
-  [sudo] ./${_SCRIPT} [OPTIONS: -[acfghprvx]]
+  [sudo] ./${_SCRIPT} [OPTIONS: -[abcdfghprvx]]
 
   ${_CNONE}OPTIONS:${_CGRAY}
   -a, --all                 Download, install and set everything
-  -b, --bookmark            Bookmark select directories to GNOME Files aka Nautilus
+  -b, --bookmark            Bookmark select directories to GNOME Files/Nautilus
   -c, --connect             Check and configure Wi-Fi connection
   -d, --dock                Set your favourite programs on the dock
   -f, --set-firefox         Configure options for Firefox
@@ -242,7 +243,6 @@ A set of post-installation methods tested on Pop!_OS 22.04 LTS.
   -h, --help                Display this help message
   -p, --set-portables       Install/update portable programs
   -r, --set-repos           Install/update non-portable programs
-  -u, --update              Update the system
   -v, --version             Display version info
   -x, --gnome-extensions    Get and enable GNOME extensions
 
@@ -265,7 +265,7 @@ License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
-Written by Vüqar Quliyev aka Victor Quebec in the sunny city of Baku, Azerbaijan.${_CNONE}
+Written by Vüqar Quliyev, aka Victor Quebec, for the benefit of the Pop!_OS community.${_CNONE}
 EOF
 }
 
@@ -453,6 +453,16 @@ headline() {
     fi
 }
 
+killffx() {
+    while
+        ffxproc=$(pidof firefox)
+        [ -n "$ffxproc" ]
+    do
+        log_trace "(FFX)" <<<"$(kill -9 "$ffxproc" 2>&1 >/dev/null)"
+        sleep 3
+    done
+}
+
 log_and_exit() {
     local msg="$1"
     local code="${2:-1}"
@@ -461,7 +471,7 @@ log_and_exit() {
 }
 
 log_message() {
-    # accepts three (3) arguments
+    # accepts three (3) arguments:
     # arg 1 : message
     # arg 2 : log level can be 0-info (default)
     #                          1-success
@@ -489,12 +499,8 @@ log_message() {
 }
 
 log_trace() {
+    # Description:  Adds timestamp to logs without using external utilities
     local line
-    # Adds timestamp to logs without using external utilities
-    # Output will be automatically written to $_LOGFILE
-    # Arguments: 1
-    # ARG -1: printf variable for formatting the log
-    # Usage command | _add_timestamp_to_logs "$1"
 
     while IFS= read -r line; do
         if ! pgrep "apt-get" >/dev/null && grep -Eq '[0-9]*\.?[0-9]+%' <<<"$line"; then # supress progress reports from 'calibre', 'flatpak', etc.
@@ -509,7 +515,7 @@ log_trace() {
 }
 
 misc__do_bookmarks() {
-    # Attention: must be executed after misc_automount_drives()!
+    # Caution: must be executed after misc_automount_drives()!
     paths="${1}"
     declare -A bookmarks
 
@@ -548,12 +554,12 @@ misc__do_wallpapers() {
     wppaths=()
 
     if mkdir -p "$_WALLPPR" 2>&1 | log_trace "(MSC)"; then
-        log_message "POPPI will copy your wallpapers from one of these sources to '$_WALLPPR':"
+        log_message "Please wait until POPPI identifies the source of your wallpapers to copy from ..."
 
-        # pack the output of the `find` command into an array
+        # find dirs with string 'wallpaper' and pack the output into an array
         while IFS= read -r line; do
             ((i++))
-            wppaths+=("$line")
+            [ "$line" != "$_USERHOME/Pictures/Wallpapers" ] && wppaths+=("$line")
             log_message "$i) $line"
         done < <(sudo find / -iname 'wallpapers' -type d 2>/dev/null) # for differences between piping and command expansion, see: https://sl.bing.net/cAvuQ96tlK0
 
@@ -561,7 +567,7 @@ misc__do_wallpapers() {
             echo
             while true; do
                 if ((i > 1)); then # more than one 'Wallpapers' directory found
-                    log_message "Please select one [1-$i]:" 6
+                    log_message "Please select the source directory [1-$i]:" 6
                     read -r -p "" num
 
                     if [[ $num =~ ^[0-9]+$ ]] && ((num > 0)) && ((num <= i)); then
@@ -744,8 +750,8 @@ misc_set_crontab() {
         # shellcheck disable=SC2016
         {
             printf '%s\n\n' '#!/usr/bin/env bash'
-            printf '%s\n' 'printf "\n%s\n" "$(date)" >> '"$_APPSDIR"'/sync-script.log'
-            printf '%s\n' 'rsync -acuv --delete /mnt/'"${_DRIVES[0]}"'/ /mnt/'"${_DRIVES[1]}"'/Seagate/ >>'"$_APPSDIR"'/sync-script.log'
+            printf '%s\n' 'printf "\n%s\n" "$(date)" >> '"$_APPSDIR"'/rsync-script.log'
+            printf '%s\n' 'rsync -acuv --delete /mnt/'"${_DRIVES[0]}"'/ /mnt/'"${_DRIVES[1]}"'/Seagate/ >>'"$_APPSDIR"'/rsync-script.log'
         } >>"./rsync-script.sh"
         mv "./rsync-script.sh" "$_APPSDIR/rsync-script.sh" 2>&1 | log_trace "(MSC)"
         cronline+=("3 23 * * * /bin/sh $_APPSDIR/rsync-script.sh >> $_APPSDIR/cron-jobs.log 2>&1")
@@ -807,16 +813,15 @@ misc_set_gnome_themes() {
 
     if mkdir -p "$_USERHOME/.themes"; then
         tar_extractor "$filename" "$theme" "$_USERHOME/.themes"
+        gsettings set org.gnome.desktop.interface gtk-theme 'Nordic' &&
+            gsettings set org.gnome.desktop.wm.preferences theme 'Nordic' &&
+            gsettings set org.gnome.desktop.interface icon-theme 'Nordic' &&
+            dconf write /org/gnome/terminal/legacy/profiles:/:"$_DFTRMPRFL"/use-theme-colors true && # terminal uses theme colours
+            log_message "GNOME theme $theme set up" 1 "$_STRLEN"
     else
         log_message "Cannot create directory for GNOME Themes" 3
         return
     fi
-
-    gsettings set org.gnome.desktop.interface gtk-theme 'Nordic' &&
-        gsettings set org.gnome.desktop.wm.preferences theme 'Nordic' &&
-        gsettings set org.gnome.desktop.interface icon-theme 'Nordic' &&
-        dconf write /org/gnome/terminal/legacy/profiles:/:"$_DFTRMPRFL"/use-theme-colors true && # terminal uses theme colours
-        log_message "GNOME theme $theme set up" 1 "$_STRLEN"
 }
 
 misc_set_lo_themes() {
@@ -1030,7 +1035,7 @@ set_configs() {
 
         # shellcheck disable=SC2068
         for obj in ${objs[@]}; do
-            cp -r "./$obj" "$_USERHOME" 2>&1 | log_trace "(CFG)" && log_message "Copied $obj to $HOME" 1
+            cp -r "./$obj" "$_USERHOME" 2>&1 | log_trace "(CFG)" && log_message "Copied $obj to $_USERHOME" 1
         done
     else
         log_message "Failed to locate directory '$_BASEDIR/data/configs'" 3
@@ -1049,8 +1054,8 @@ set_configs() {
     fi
 
     # configuration files for VSCodium Portable
-    cd "$_BASEDIR"/data/configs_portables/vscodium || return
     if [ -d "$_APPSDIR"/vscodium ]; then
+        cd "$_BASEDIR"/data/configs_portables/vscodium || return
         cp -r "./data" "$_APPSDIR"/vscodium 2>&1 | log_trace "(CFG)" &&
             while read -r extension || [[ -n $extension ]]; do
                 "$_APPSDIR"/vscodium/bin/codium --install-extension "$extension" --force 2>&1 | log_trace "(CFG)"
@@ -1108,6 +1113,7 @@ set_firefox() {
     # TODO:
     # make bookmarks with search engines ready (manually)
     # make extension settings ready (manually)
+    # check extensions.webextensions.uuid in prefs.js for GroupSpeedDial
 
     # HOME=/tmp XAUTHORITY=/tmp firefox --version
     # or, /usr/lib/firefox/application.ini
@@ -1173,7 +1179,7 @@ set_firefox() {
             # run in the background
             firefox --headless -P "default-$channel" 2>&1 | log_trace "(FFX)" &
             sleep 3
-            log_trace "(FFX)" <<<"$(kill -9 "$(pidof firefox)" 2>&1 >/dev/null)"
+            killffx
         else
             log_message "Failed to create profile directory for unknown reason(s)" 3
             return 1
@@ -1182,7 +1188,7 @@ set_firefox() {
         log_message "Firefox profile exists: $_FFXPRF" 1
     fi
 
-    ff_permissions # create a custom file permissions.sqlite
+    ff_permissions && log_message "Firefox persistent cookies set" 1 # create a custom file permissions.sqlite
 
     #-- download and install extensions --#
     if [ -d "$_FFXDIR/$_FFXPRF" ] && [ -f "${_BASEDIR}/data/firefox/xpi.lst" ]; then
@@ -1206,7 +1212,6 @@ set_firefox() {
                         log_message "Extension '${ext_title}' not found" 3
                         continue
                     else
-                        # https://addons.mozilla.org/firefox/downloads/file/763598/diigo_web_collector-6.0.0.4.xpi
                         fetch_file "$xpiURL" "$xpi_filename" "${_BASEDIR}/data/firefox"
                     fi
                 done <"$xpi_list"
@@ -1236,11 +1241,12 @@ set_firefox() {
                     continue
                 else
                     _XID=$(trimex "$xid")
-                    log_message "Extension ID for $xpi: $_XID"
+                    log_message "Extension ID for '$xpi': $_XID"
                 fi
 
-                mv "${_BASEDIR}/data/firefox/$(basename "$xpi")" "${_BASEDIR}/data/firefox/${_XID}.xpi" 2>&1 | log_trace "(FFX)"                                            # rename extension
-                mv "${_BASEDIR}/data/firefox/${_XID}.xpi" "$_FFXDIR/$_FFXPRF/extensions" >/dev/null 2>&1 && log_message "Extension '$_XID.xpi' moved to profile $_FFXPRF" 1 # move extension to user profile
+                mv "${_BASEDIR}/data/firefox/$(basename "$xpi")" "${_BASEDIR}/data/firefox/${_XID}.xpi" 2>&1 | log_trace "(FFX)" # rename extension
+                mv "${_BASEDIR}/data/firefox/${_XID}.xpi" "$_FFXDIR/$_FFXPRF/extensions" >/dev/null 2>&1 &&
+                    log_message "Extension '$_XID.xpi' moved to profile $_FFXPRF" 1 # move extension to user profile
             done
         else
             log_message "Failed to create extensions directory for user profile $_FFXPRF"
@@ -1257,6 +1263,35 @@ set_firefox() {
                 log_message "Failed to copy '$file_path' to the Firefox user profile" 3
             fi
         done
+
+        # Determine and Set UUID for GroupSpeedDial: this is a private case to ensure consistency between prefs.js and user-overrides.js
+        # Otherwise (after running the Arkenfox stuff) the homepage fails to load GlobalSpeedDial also because the extension UUID values
+        # are assigned/changed automatically by Firefox with each extension installation.
+        #
+        # run in the background again to add extension UUIDs to prefs.js
+        firefox --headless -P "default-$channel" 2>&1 | log_trace "(FFX)" &
+        sleep 10
+        killffx
+
+        # define global variables
+        _FFXPREFS="$_FFXDIR/$_FFXPRF"/prefs.js
+        _FFXUSEROVERRIDES="$_FFXDIR/$_FFXPRF"/user-overrides.js
+
+        if [ -f "$_FFXPREFS" ] && [ -f "$_FFXUSEROVERRIDES" ]; then
+            # extract the UUID from prefs.js
+            UUID=$(grep -oP '(?<="admin@fastaddons\.com_GroupSpeedDial\\"\:\\")[^"\\]+' "$_FFXPREFS")
+
+            # check if UUID was found
+            if [ -z "$UUID" ]; then
+                log_message "UUID not found in $_FFXPREFS" 3
+            else
+                # replace the UUID in user-overrides.js
+                sed -i "/browser\.startup\.homepage/c\user_pref\(\"browser\.startup\.homepage\"\,\ \"moz-extension\:\/\/$UUID\/dial\.html\"\);" "$_FFXUSEROVERRIDES" &&
+                    log_message "UUID replaced successfully in $_FFXUSEROVERRIDES" 1
+            fi
+        else
+            log_message "Files 'prefs.js' and 'user-overrides.js' not found in $_FFXDIR/$_FFXPRF. Skipping ..." 3
+        fi
 
         # set Arkenfox stuff
         if [ -f "$_FFXDIR/$_FFXPRF/user-overrides.js" ]; then
@@ -1285,7 +1320,7 @@ set_firefox() {
         fi
     else
         log_message "Failed to identify Firefox user profile.
-    Also, please check if the list of Firefox extensions is available in '$xpi_list'." 3
+    Also, please check if $xpi_list is not empty." 3
     fi
 }
 
@@ -1334,7 +1369,7 @@ set_gsettings() {
     declare -a arr_GS=("org.gnome.calculator button-mode 'advanced'"
         "org.gnome.calculator show-thousands true"
         "org.gnome.desktop.input-sources per-window true"
-        "org.gnome.desktop.input-sources sources [('xkb', 'us'), ('xkb', 'az'), ('xkb', 'ru'), ('xkb', 'ara')]"
+        "org.gnome.desktop.input-sources sources [('xkb', 'us'), ('xkb', 'az'), ('xkb', 'ru'), ('xkb', 'ir')]"
         "org.gnome.desktop.input-sources xkb-options ['terminate:ctrl_alt_bksp', 'grp:alt_shift_toggle', 'compose:sclk']"
         "org.gnome.desktop.interface clock-format '24h'"
         "org.gnome.desktop.interface clock-show-seconds true"
@@ -1365,6 +1400,10 @@ set_gsettings() {
         "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name 'File Browser'"
         "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command 'nautilus $_USERHOME/Downloads'"
         "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding '<Super>f'"
+        "org.gnome.settings-daemon.plugins.media-keys custom-keybindings ['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']"
+        "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ name 'Change Wallpaper'"
+        "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ command 'styli.sh -g -d $_WALLPPR'"
+        "org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ binding '<Super>Insert'"
         "org.gnome.settings-daemon.plugins.media-keys home @as []"
         "org.gnome.shell.extensions.dash-to-dock dash-max-icon-size 25"
         "org.gnome.shell.extensions.dash-to-dock dock-fixed false"
@@ -1387,6 +1426,7 @@ set_gsettings() {
         gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "(GST)"
     done
 
+    # TODO: check if successful before echoing
     log_message "GNOME settings set" 1
 }
 
@@ -1405,22 +1445,24 @@ set_permission() {
 set_portables() {
     local apps counter filename name archives total url
     # TODO: for i in $(jq -r '.recommendations[]' .vscodium/extensions.json); do codium --install-extension $i --force; done
+    # 'ImageMagick;imagemagick;https://imagemagick.org/archive/binaries/magick;n/a'
 
     declare -a portables=('Audacity;audacity;https://api.github.com/repos/audacity/audacity/releases/latest;grep "browser_download_url.*AppImage" | cut -d\" -f4'
         'Bleachbit;bleachbit;https://api.github.com/repos/bleachbit/bleachbit/releases/latest;grep "tarball_url" | cut -d\" -f4'
         'CPU-X;cpux;https://api.github.com/repos/X0rg/CPU-X/releases/latest;grep "browser_download_url.*AppImage\"" | cut -d\" -f4'
         'DeadBeef;deadbeef;https://sourceforge.net/projects/deadbeef/files/travis/linux/master/;grep -o "href=\"https://sourceforge.net/projects/deadbeef/files/travis/linux/master/deadbeef-static.*tar.bz2/download" | cut -d\" -f2'
         'HW-Probe;hwprobe;https://api.github.com/repos/linuxhw/hw-probe/releases/latest;grep "browser_download_url.*AppImage" | cut -d\" -f4 | sort | tail -1'
-        'ImageMagick;imagemagick;https://imagemagick.org/archive/binaries/magick;n/a'
         'Inkscape;inkscape;https://inkscape.org/release/all/gnulinux/appimage;grep ".*\AppImage<" | cut -d\" -f2 | tail -1 | sed "s/^/https:\/\/inkscape\.org/"'
         'KeePassXC;keepassxc;https://keepassxc.org/download/#linux;grep "AppImage\"" | cut -d\" -f2'
         'Neofetch;neofetch;https://raw.githubusercontent.com/hykilpikonna/hyfetch/master/neofetch;n/a'
         'QBittorrent;qbittorrent;https://www.qbittorrent.org/download.php;grep -P ".*sourceforge.*\d_x86_64\.AppImage\/download" | cut -d\" -f4 | head -1'
-        'SMPlayer;smplayer;https://api.github.com/repos/smplayer-dev/smplayer/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "appimage"'
+        'SMPlayer;smplayer;https://api.github.com/repos/smplayer-dev/smplayer/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "appimage$"'
         'SQLite Browser;sqlitebrowser;https://api.github.com/repos/sqlitebrowser/sqlitebrowser/releases/latest;grep "browser_download_url.*AppImage" | cut -d\" -f4'
         'Styli.sh;styli.sh;https://raw.githubusercontent.com/thevinter/styli.sh/master/styli.sh;n/a'
         'VSCodium;vscodium;https://api.github.com/repos/VSCodium/vscodium/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "vscodium\-linux\-x64.*tar.gz$"'
-        'YT-DLP;yt-dlp;https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest;grep "browser_download_url.*\/yt-dlp\"" | cut -d\" -f4'
+        'XnView;xnview;https://download.xnview.com;grep -oP "(?<=href=\")XnView_MP\..*AppImage(?=\")" | xargs -I {} echo "https://download.xnview.com/{}"'
+        'Xournal++;xournalpp;https://api.github.com/repos/xournalpp/xournalpp/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "appimage$"'
+        'YT-DLP;yt-dlp;https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "yt-dlp$"'
     )
 
     # create directory for portable programs and bookmark it to Nautilus
@@ -1601,16 +1643,6 @@ set_repos() {
         log_message "DConf Editor already installed. Skipping ..."
     fi
 
-    # .:. EASYEFFECTS .:.
-    log_message "Installing EasyEffects ..."
-    if ! flatpak list | grep -iq "easyeffects" 2>&1 | log_trace "(PPA)"; then
-        flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y flathub com.github.wwmm.easyeffects 2>&1 | log_trace "(PPA)"
-        log_message "EasyEffects installation complete" 1
-    else
-        log_message "EasyEffects already installed. Skipping ..."
-    fi
-
     # .:. FFMPEG .:.
     log_message "Installing FFMPEG ..."
     url=$(curl -sfL 'https://ffmpeg.org/download.html' | grep -o "http.*.tar.xz")
@@ -1622,9 +1654,23 @@ set_repos() {
     if which yasm >/dev/null && tar -xf "$temp_dir/$filename" --strip-components=1 -C . 2>&1 | log_trace "(PPA)"; then
         sh ./configure --enable-shared 2>&1 | log_trace "(PPA)"
         make -j"$(nproc)" 2>&1 | log_trace "(PPA)"
-        sudo make install 2>&1 | log_trace "(PPA)"
+        sudo checkinstall 2>&1 | log_trace "(PPA)"
+
+        # find a .DEB file created by checkinstall
+        debfile=$(find . -maxdepth 1 -type f -iname "*.DEB")
+
+        # check if the file was found
+        if [ -n "$debfile" ]; then
+            # filename=$(basename "$debfile")         # extract the file name from the path
+            # new_debfile="ffmpeg${filename:0:1}.deb" # extract the first char from the file name
+            sudo mv "$debfile" "$_USERHOME/Downloads/$debfile"
+            sudo chown "$_USERID":"$_USERNAME" "$_USERHOME/Downloads/$debfile"
+            log_message "File renamed to $_USERHOME/Downloads/$debfile" 1
+        else
+            log_message "No .DEB file found in the directory." 3
+        fi
+
         cd ..
-        rm -r "$temp_dir"
         log_message "FFMPEG installation complete" 1
     else
         log_message "Failed to install FFMPEG.
@@ -1660,6 +1706,15 @@ set_repos() {
         log_message "lm-sensors already installed. Skipping ..."
     fi
 
+    # .:. PDF-TOCGEN .:.
+    log_message "Installing PDF TOC Generator ..."
+    if ! which pdftocgen >/dev/null 2>&1 | log_trace "(PPA)"; then
+        pip3 install -U pdf.tocgen 2>&1 | log_trace "(PPA)"
+        log_message "PDF TOC Generator installation complete" 1
+    else
+        log_message "PDF TOC Generator already installed. Skipping ..."
+    fi
+
     # .:. TEAMVIEWER .:.
     log_message "Installing TeamViewer ..."
     if ! which teamviewer >/dev/null 2>&1 | log_trace "(PPA)"; then
@@ -1672,6 +1727,15 @@ set_repos() {
             log_message "Teamviewer installation complete" 1
     else
         log_message "TeamViewer already installed. Skipping ..."
+    fi
+
+    # .:. VIRT-MANAGER .:.
+    log_message "Installing Virtualisation Manager ..."
+    if ! which virt-manager >/dev/null 2>&1 | log_trace "(PPA)"; then
+        sudo apt-get -o=Dpkg::Use-Pty=0 install virt-manager 2>&1 | log_trace "(PPA)"
+        log_message "Virtualisation Manager installation complete" 1
+    else
+        log_message "Virtualisation Manager already installed. Skipping ..."
     fi
 }
 
@@ -1802,7 +1866,7 @@ tar_extractor() {
 
 # shellcheck disable=SC2001
 trimex() {
-    # clean the string with extension name as much as possible
+    # Description: Clean the string with Firefox extension name as much as possible
     # TODO: consider occasions when extension's ID indeed starts with '@' or similar'. Such extensions usually have IDs in manifest.json
 
     [ $# -ne 1 ] && log_message "Wrong number of arguments" 3
@@ -1844,7 +1908,26 @@ user_consent() {
 
 all() {
     # The order of functions does matter!
+    set_portables
+    set_repos
+    set_firefox
+    miscops
+    set_configs
+    set_gsettings
+    get_gnome_extensions
+    set_gnome_extensions
+    misc_change_user_avatar
+    set_favourites
+    system_update
 
+    [ -f "$_APPSDIR/styli.sh" ] && [ -d "$_WALLPPR" ] && "$_APPSDIR/styli.sh" -g -d "$_WALLPPR" # set a random wallpaper
+    echo                                                                                        # an empty line
+}
+
+# The magic starts here ...
+main() {
+    option=${1}
+    __init_vars
     clear
     xdotool windowsize "$(xdotool getactivewindow)" 110% 110% && sleep 1
     headline
@@ -1858,41 +1941,6 @@ all() {
     system_check
     system_update
     set_dependencies
-    set_portables
-    set_repos
-    set_firefox
-    miscops
-    set_configs
-    get_gnome_extensions
-    set_gsettings
-    set_gnome_extensions
-    misc_change_user_avatar
-    set_favourites
-    system_update
-    screenlock
-
-    [ -f "$_APPSDIR"/styli.sh ] && [ -d "$_WALLPPR" ] && "$_APPSDIR/styli.sh -g -d $_WALLPPR" # set a random wallpaper
-    echo
-    log_message "POPPI took $SECONDS seconds to complete all the assignments. See you next time!" 1 "$_STRLEN"
-    sleep 5
-    # clear
-}
-
-# The magic starts here ...
-main() {
-    option=${1}
-    __init_vars
-
-    # determine when to start logging the script
-    declare -a fargs
-    fargs=('' '-a' '--all' '-h' '--help' '-v' '--version')
-    bool_initlog=0
-
-    for arg in "${fargs[@]}"; do
-        [[ "$1" != "$arg" ]] && ((bool_initlog++))
-    done
-
-    [ "$bool_initlog" -eq ${#fargs[@]} ] && __init_logfile # start logging, if values match
 
     case $option in
     -a | --all) all ;;
@@ -1902,9 +1950,14 @@ main() {
     -f | --firefox) set_firefox ;;
     -g | --set-gsettings) set_gsettings ;;
     -h | --help) display_usage ;;
-    -p | --set-portables) set_portables ;;
-    -r | --set-repos) set_repos ;;
-    -u | --update) system_update ;;
+    -p | --set-portables)
+        set_portables
+        set_configs
+        ;;
+    -r | --set-repos)
+        set_repos
+        set_configs
+        ;;
     -v | --version) display_version ;;
     -x | --gnome-extensions)
         get_gnome_extensions
@@ -1912,6 +1965,10 @@ main() {
         ;;
     *) display_usage ;;
     esac
+
+    log_message "POPPI took $SECONDS seconds to complete all the assignments. See you next time!" 1 "$_STRLEN"
+    sleep 5
+    screenlock
 }
 
 main "$@"
