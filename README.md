@@ -1,8 +1,3 @@
-# poppi
-
-POPPI is short for Pop!_OS Post-Installation, which is basically a set of methods to download and install files, apply settings, and make other tweaks to the Pop!_OS operating system after installation as necessary.
-
-The script was tested under Pop!_OS 22.04 only. So, please use and modify with care.
 # Pop!_OS Post-Installation (POPPI) Script
 
 POPPI is a highly-customisable set of Bash functions originally developed for and tested on Pop!_OS 22.04 LTS powered by Linux kernel v6.9.3. It will yield the best results when used on a fresh system installation. POPPI is a work in progress and will probably remain so as long as there is a strong interest from the user community.
