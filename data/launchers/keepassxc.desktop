@@ -36,7 +36,11 @@ Comment[da]=Fællesskabsdrevet port af Windows-programmet “KeePass Password Sa
 Comment[et]=Kogukonna arendatav port Windowsi programmist KeePass Password Safe
 Comment[ru]=Разработанный сообществом порт Windows-приложения KeePass Password Safe
 Exec=keepassxc %f
+<<<<<<< HEAD
 Icon=@APP_ICON_NAME@
+=======
+Icon=keepassxc
+>>>>>>> 58686a4 (Complete refactoring of the code.)
 StartupWMClass=keepassxc
 StartupNotify=true
 Terminal=false
@@ -44,3 +48,10 @@ Type=Application
 Version=1.0
 Categories=Utility;Security;Qt;
 MimeType=application/x-keepass2;
+<<<<<<< HEAD
+=======
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-Delay=2
+X-GNOME-Autostart-enabled=true
+>>>>>>> 58686a4 (Complete refactoring of the code.)

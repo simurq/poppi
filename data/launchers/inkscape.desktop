@@ -12,7 +12,11 @@ MimeType=${INKSCAPE_MIMETYPE}
 TryExec=inkscape
 Terminal=false
 StartupNotify=true
+<<<<<<< HEAD
 Icon=${INKSCAPE_ICONPATH}
+=======
+Icon=inkscape
+>>>>>>> 58686a4 (Complete refactoring of the code.)
 X-Ayatana-Desktop-Shortcuts=Drawing
 Actions=new-window;
 Exec=inkscape %F
