@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Hidden=false
+NoDisplay=false
+Name=Poppi
+Terminal=true
+Version=1.0
+X-GNOME-Autostart-Delay=3
+X-GNOME-Autostart-enabled=true
+Comment=Run POPPI once upon reboot required after a system update

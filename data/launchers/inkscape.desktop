@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+[Desktop Entry]
+Version=1.0
+Name=Inkscape
+GenericName=Vector Graphics Editor
+X-GNOME-FullName=Inkscape Vector Graphics Editor
+Comment=Create and edit Scalable Vector Graphics images
+Keywords=image;editor;vector;drawing;
+Type=Application
+Categories=Graphics;VectorGraphics;GTK;
+MimeType=${INKSCAPE_MIMETYPE}
+TryExec=inkscape
+Terminal=false
+StartupNotify=true
+Icon=inkscape
+X-Ayatana-Desktop-Shortcuts=Drawing
+Actions=new-window;
+Exec=inkscape %F
+
+[X-Drawing Shortcut Group]
+Name=New Drawing
+Exec=inkscape
+TargetEnvironment=Unity
+
+[Desktop Action new-window]
+Name=Open a New Window
+Exec=inkscape

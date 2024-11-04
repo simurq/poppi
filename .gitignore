@@ -1,4 +1,7 @@
+.cspell/
 .vscode/
-data/
+poppi-old.sh
+test-ground.sh
 *.code-workspace
+*.json
 *.log
