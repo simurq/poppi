@@ -1220,7 +1220,6 @@ restart() {
 screenlock() {
     # Description:  Disables screen-lock and power suspend mode during system updates and re-enables them to previous (user) values when done.
     # Arguments:    None.
-
     if [[ $_isLOCKED -eq 0 ]]; then
         # Backup user values
         _SCREENLOCK=$(gsettings get org.gnome.desktop.session idle-delay | awk '{print $2}')
