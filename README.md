@@ -50,10 +50,10 @@ wget https://github.com/simurq/poppi/releases/latest/download/poppi.sh -O poppi.
 chmod +x ./poppi.sh
 ```
 
-#### Using the latest master branch
+#### Using the latest `development` branch
 
 ```console
-wget https://raw.githubusercontent.com/simurq/poppi/main/poppi.sh -O poppi.sh
+wget https://raw.githubusercontent.com/simurq/poppi/poppi-dev/poppi.sh -O poppi.sh
 chmod +x ./poppi.sh
 ```
 
@@ -264,7 +264,7 @@ This section covers the operations with the Firefox browser, including but not l
 ```
 
 </td>
-<td>enables privacy, security, and anti-tracking options as specified in <a href="https://github.com/arkenfox/user.js">Arkenfox's</a>) JavaScript addon (default=<b>1</b>).</td>
+<td>enables privacy, security, and anti-tracking options as specified in <a href="https://github.com/arkenfox/user.js">Arkenfox's</a> JavaScript addon (default=<b>1</b>).</td>
 </tr>
 <tr>
 <td>
