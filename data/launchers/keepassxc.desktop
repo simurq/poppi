@@ -37,10 +37,14 @@ Comment[et]=Kogukonna arendatav port Windowsi programmist KeePass Password Safe
 Comment[ru]=Разработанный сообществом порт Windows-приложения KeePass Password Safe
 Exec=keepassxc %f
 <<<<<<< HEAD
+<<<<<<< HEAD
 Icon=@APP_ICON_NAME@
 =======
 Icon=keepassxc
 >>>>>>> 58686a4 (Complete refactoring of the code.)
+=======
+Icon=keepassxc
+>>>>>>> poppi-dev
 StartupWMClass=keepassxc
 StartupNotify=true
 Terminal=false
@@ -49,9 +53,15 @@ Version=1.0
 Categories=Utility;Security;Qt;
 MimeType=application/x-keepass2;
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> poppi-dev
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-Delay=2
 X-GNOME-Autostart-enabled=true
+<<<<<<< HEAD
 >>>>>>> 58686a4 (Complete refactoring of the code.)
+=======
+>>>>>>> poppi-dev

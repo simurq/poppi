@@ -22,14 +22,15 @@ Currently, POPPI does not support Cosmic DE and has not been tested on other Ubu
 * [Installs portable, .DEB, and source packages](#default-external-portables-and-repositories)
 * [Adds repositories](#default-external-portables-and-repositories)
 * [Configures Firefox](#section-firefox)
-* [Automounts external drives](#section-miscops)
-* [Bookmarks select directories](#section-miscops)
-* [Adds custom user avatar](#section-miscops)
+* [Sets your browser's privacy environment (thanks to Arkenfox)](#section-firefox)
+* [Automounts external drives by label](#section-miscops)
+* [Bookmarks select directories to GNOME Files/Nautilus](#section-miscops)
+* [Adds custom user avatar on login page](#section-miscops)
 * [Adds custom cronjobs](#section-miscops)
 * [Downloads, installs, and configures GNOME extensions](#section-miscops)
 * [Adds favourite packages to dock](#section-miscops)
 * [Adds custom formulas to GNOME Calc](#section-miscops)
-* [Sets custom GNOME settings](#section-miscops)
+* [Sets custom GNOME settings through GNOME's native GSettings](#section-miscops)
 * [Downloads and installs external fonts](#section-miscops)
 * [Copies and/or downloads wallpapers from external sources](#section-miscops)
 * [Performs other tweaks...](#section-miscops)
@@ -49,10 +50,10 @@ wget https://github.com/simurq/poppi/releases/latest/download/poppi.sh -O poppi.
 chmod +x ./poppi.sh
 ```
 
-#### Using the latest master branch
+#### Using the latest `development` branch
 
 ```console
-wget https://raw.githubusercontent.com/simurq/poppi/main/poppi.sh -O poppi.sh
+wget https://raw.githubusercontent.com/simurq/poppi/poppi-dev/poppi.sh -O poppi.sh
 chmod +x ./poppi.sh
 ```
 
@@ -263,7 +264,7 @@ This section covers the operations with the Firefox browser, including but not l
 ```
 
 </td>
-<td>enables privacy, security, and anti-tracking options as specified in <a href="https://github.com/arkenfox/user.js">Arkenfox's</a>) JavaScript addon (default=<b>1</b>).</td>
+<td>enables privacy, security, and anti-tracking options as specified in <a href="https://github.com/arkenfox/user.js">Arkenfox's</a> JavaScript addon (default=<b>1</b>).</td>
 </tr>
 <tr>
 <td>
@@ -641,23 +642,23 @@ This section specifies miscellaneous operations. Currently, it covers only those
 
 ### 3. Prepare your files
 
-In addition to customising the [configuration file](#2-setup-the-json-configuration-file-configurepop), you will also need to feed POPPI with your custom files from the `DATA` folder, which comes along with the script, as described below. After the download of the script, you will find most of them empty, waiting for your input.
+In addition to customising the [configuration file](#2-setup-the-json-configuration-file-configurepop), you will also need to feed POPPI with your custom files from the `DATA` directory, as described below. After the first run of the script, all the directories will be created in the same directory. But you will find most of them empty, waiting for your input.
 
 #### Directory `CONFIGS`
 
-Contains all the configuration files for your [installable packages](#section-packages). The contents of the directory will be copied directly to your `$HOME`, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in the `CONFIGS` directory.
+Contains all the configuration files for your [installable packages](#section-packages). The contents of the directory will be copied directly to your `$HOME`, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGS`.
 
 #### Directory `CONFIGSP`
 
-Contains all the configuration files for your [portable packages](#section-packages). The contents of the directory will be copied directly to the location with your portables, as necessary, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in the `CONFIGSP` directory.
+Contains all the configuration files for your [portable packages](#section-packages). The contents of the directory will be copied directly to the location with your portables, as necessary, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGSP`.
 
 #### Directory `DOTFILES`
 
-Contains all your [.dotfiles](https://wiki.archlinux.org/title/Dotfiles). The files in this directory will be copied directly to your `$HOME` directory as well.
+Contains all your [.dotfiles](https://wiki.archlinux.org/title/Dotfiles). The files will be copied directly to your `$HOME` directory as well.
 
 #### Directory `FIREFOX`
 
-Contains all the files to be copied to your Firefox profile directory, which is typically located at `~/.mozilla/firefox/<your_profile_directory>`.
+Contains all the files to be copied to your Firefox profile directory, which is typically located at `~/.mozilla/firefox/<your_profile_directory>`. E.g., customs CSS stylesheets, [user-overrides.js](https://github.com/arkenfox/user.js/wiki), [custom search engines](https://addons.mozilla.org/en-US/firefox/addon/mozlz4-edit/), SQL databases, etc.
 
 #### Directory `ICONS`
 

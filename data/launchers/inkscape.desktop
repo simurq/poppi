@@ -13,10 +13,14 @@ TryExec=inkscape
 Terminal=false
 StartupNotify=true
 <<<<<<< HEAD
+<<<<<<< HEAD
 Icon=${INKSCAPE_ICONPATH}
 =======
 Icon=inkscape
 >>>>>>> 58686a4 (Complete refactoring of the code.)
+=======
+Icon=inkscape
+>>>>>>> poppi-dev
 X-Ayatana-Desktop-Shortcuts=Drawing
 Actions=new-window;
 Exec=inkscape %F
