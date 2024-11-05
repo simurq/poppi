@@ -2402,21 +2402,12 @@ system_update() {
     # Description:  Applies system-wide updates and removes redundant packages.
     # Arguments:    None.
     log_message "Performing system update ..." 5
-<<<<<<< HEAD
-    stop_packagekitd # unlock apt
-    # pop-upgrade release upgrade 2>&1 | log_trace "[POP]"                  # System76 upgrades
-    #    log_trace "[APT]" <<<"$(sudo apt-get -o=Dpkg::Use-Pty=0 update 2>&1)" # no prompts with 'apt update'; redirect all msgs to log_trace()
-
-    sudo apt-get update 2>&1 | log_trace "[APT]"
-    sudo apt-get full-upgrade 2>&1 | log_trace "[APT]"
-=======
     stop_packagekitd                                                      # unlock apt
     pop-upgrade release upgrade 2>&1 | log_trace "[POP]"                  # System76 upgrades
     log_trace "[APT]" <<<"$(sudo apt-get -o=Dpkg::Use-Pty=0 update 2>&1)" # no prompts with 'apt update'; redirect all msgs to log_trace()
 
     sudo apt-get update 2>&1 | log_trace "[APT]"
     sudo apt-get full-upgrade -y 2>&1 | log_trace "[APT]"
->>>>>>> poppi-dev
 
     # reboot the system, if necessary
     if [ -e /var/run/reboot-required ]; then
