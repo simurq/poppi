@@ -4,6 +4,7 @@ data/configs
 data/configsp
 data/dotfiles
 data/firefox
+data/misc/lolo.png
 poppi-old.sh
 test-ground.sh
 *.code-workspace
