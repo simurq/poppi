@@ -100,6 +100,7 @@ __init_vars() {
     _FFXCONFIG=0                                                                       # configure Firefox?
     _FFXCOOKIES=()                                                                     # Firefox cookies to keep
     _FFXDIR="$HOME/.mozilla/firefox"                                                   # Firefox profile directory
+    _FFXEXTSLST=()                                                                     # list of installed Firefox extensions
     _FFXEXTS=()                                                                        # list of Firefox extensions
     _FFXHOMEPAGE=0                                                                     # set/unset custom homepage for Firefox
     _FFXPREFS='prefs.js'                                                               # Firefox preferences
@@ -145,7 +146,7 @@ __init_vars() {
     _USERID=$(id -u "$_USERNAME")                                                      # user login id
     _USERPROFILE="$HOME"/.profile                                                      # user profile directory (requires system reboot)
     _USERSESSION="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$_USERID/bus"           # user session, useful for crontab operations
-    _VERSION="0.9.2"                                                                   # script version
+    _VERSION="0.9.3"                                                                   # script version
     _VSIX=()                                                                           # extensions for VS Codium
     _WPEXTDIR=''                                                                       # external directory to source wallpapers
     _WPON=0                                                                            # enable custom wallpapers
@@ -204,7 +205,7 @@ __load_configs() {
         ["MISCOPS.\"msc.gnome_settings\""]="_GSETTINGS"
         ["PACKAGES.\"pkg.autostart\""]="_AUTOSTART"
         ["PACKAGES.\"pkg.portables\""]="_PORTABLES"
-        ["PACKAGES.\"pkg.portables\".vscodium.extensions"]="_VSIX"
+        ["PACKAGES.\"pkg.portables\".codium.extensions"]="_VSIX"
         ["PACKAGES.\"pkg.installers\""]="_INSTALLERS"
         ["PACKAGES.\"pkg.installers\".LibreOffice.extensions"]="_LOEXTS"
     )
@@ -359,7 +360,7 @@ __make_configs() {
 
     # Make a new configuration file
     if ! cat <<EOF >"$_BASEDIR"/configure.pop 2>&1 | log_trace "[MKC]"; then
-{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":"3","gen.logfile_format":"US","gen.logfile_on":"1","gen.maximise_window":"1","gen.set_timer":"1","gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":"0","ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.profile":"","ffx.set_homepage":"0","ffx.set_privacy":"1"},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdftocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"keepassxc":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"stylish":{"required":0},"vscodium":{"required":0,"extensions":[],"settings":{"nameShort":"Visual Studio Code","nameLong":"Visual Studio Code","extensionsGallery":{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}}},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":0,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":[],"msc.ms_fonts":"0","msc.set_geary":"0","msc.volume_overamplify":"1","msc.wallpaper_on":"0","msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":"0"}}
+{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":"3","gen.logfile_format":"US","gen.logfile_on":"1","gen.maximise_window":"1","gen.set_timer":"1","gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":"0","ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.profile":"","ffx.set_homepage":"0","ffx.set_privacy":"1"},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdftocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"keepassxc":{"required":0},"krita":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"stylish":{"required":0},"codium":{"required":0,"extensions":[],"settings":{"nameShort":"Visual Studio Code","nameLong":"Visual Studio Code","extensionsGallery":{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}}},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":0,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":[],"msc.ms_fonts":"0","msc.set_geary":"0","msc.volume_overamplify":"1","msc.wallpaper_on":"0","msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":"0"}}
 EOF
         log_message "Creating user configuration file failed. Skipping ..." 3
     fi
@@ -535,6 +536,215 @@ fetch_file() {
     fi
 }
 
+ffx_extensions() {
+    # Description:  Downloads and installs Firefox extensions.
+    # Arguments:    None.
+    if [ "${#_FFXEXTS[@]}" -eq 0 ]; then
+        log_message "No Firefox extensions to install. Skipping ..." 3
+        return 81
+    fi
+
+    ext_total="${#_FFXEXTS[@]}" # Total number of extensions to install
+
+    # Process the extensions
+    if mkdir -p "$_FFXDIR/$_FFXPRF"/extensions; then
+        tmpdir=$(mktemp -d)
+
+        # Read the list of installed extensions, if any.
+        if ! touch "$_FFXDIR/$_FFXPRF"/extensions/xpi_list.txt; then
+            log_message "Failed to create a list of extensions. Skipping ..." 3
+        else
+            IFS=$'\n' read -d '' -r -a _FFXEXTSLST <"$_FFXDIR/$_FFXPRF/extensions/xpi_list.txt"
+        fi
+
+        # Download extensions
+        for extension in "${_FFXEXTS[@]}"; do
+            ((counter++))
+            # Check if extension is installed
+            if isInstalled "$extension"; then
+                log_message "Extension '$extension' is already installed. Skipping ..."
+                continue
+            fi
+
+            # Fetch extension's title from Mozilla Addons
+            ext_title=$(curl -sfL "$_FFXADDONSURL/$extension" | grep -oP '<h1 class=\"AddonTitle\"(?:\s[^>]*)?>\K.*?(?=<)')
+            if [ -z "$ext_title" ]; then
+                ext_title="$extension" # Get extension's title from the array, if fetch fails
+            fi
+
+            log_message "Downloading Firefox extension '$ext_title' ($counter/$ext_total) ..." 4 "$_STRLEN"
+
+            # Fetch extension's URL from Mozilla Addons
+            ext_URL=$(curl -sfL "$_FFXADDONSURL/$extension" | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%:-]*.xpi")
+            if [ -z "$ext_URL" ]; then
+                log_message "Failed to fetch Firefox extension URL. Skipping ..." 3
+                continue
+            fi
+
+            ext_filename=$(basename "$ext_URL")
+            fetch_file "$ext_URL" "$ext_filename" "$tmpdir"
+
+            # Rename extensions by ID
+            log_message "Trying to determine ID for Firefox extension '$ext_title' ..."
+
+            _XID=$(ffx_xID "$tmpdir/$ext_filename")
+            #echo "$_XID"
+            if [ -z "$_XID" ]; then
+                cp "$tmpdir/$ext_filename" "$_BASEDIR"/data/firefox
+                log_message "Failed to determine ID for extension '$xpi'. 
+    Please try to add the extension manually from '$_BASEDIR/data/firefox'..." 3
+            fi
+
+            # Move extension to user profile
+            if mv "$tmpdir/$ext_filename" "$_FFXDIR/$_FFXPRF/extensions/$_XID".xpi >/dev/null 2>&1; then
+                log_message "Extension '$_XID.xpi' moved to profile $_FFXPRF" 1
+            fi
+
+            printf "%s:%s\n" "$extension" "$_FFXDIR/$_FFXPRF/extensions/$_XID.xpi" >>"$_FFXDIR/$_FFXPRF"/extensions/xpi_list.txt
+        done
+    else
+        log_message "Failed to create extensions directory for '$_FFXPRF'"
+    fi
+}
+
+ffx_permissions() {
+    # Description:  Uses a Python script to interact with the SQLite database
+    # Arguments:    None.
+    if [ ${#_FFXCOOKIES[@]} -ne 0 ]; then
+        dbfile="permissions.sqlite"
+        python3 <<EOF
+import sqlite3
+
+conn = sqlite3.connect('$dbfile')   # connect to the SQLite database
+c = conn.cursor()                   # create a cursor object
+
+# Required by Firefox
+c.execute("PRAGMA user_version = 12;")
+c.execute("PRAGMA page_size = 32768;")
+c.execute("VACUUM;")
+
+# Create table moz_hosts
+c.execute('''CREATE TABLE IF NOT EXISTS moz_hosts
+             (id INTEGER PRIMARY KEY,
+              host TEXT,
+              type TEXT,
+              permission INTEGER,
+              expireType INTEGER,
+              expireTime INTEGER,
+              modificationTime INTEGER,
+              isInBrowserElement INTEGER)''')
+
+# Create table moz_perms
+c.execute('''CREATE TABLE IF NOT EXISTS moz_perms
+             (id INTEGER PRIMARY KEY,
+              origin TEXT UNIQUE,
+              type TEXT,
+              permission INTEGER,
+              expireType INTEGER,
+              expireTime INTEGER,
+              modificationTime INTEGER)''')
+
+# Insert a row of data
+$(for url in "${_FFXCOOKIES[@]}"; do
+            [ -n "$url" ] && echo "if not c.execute(\"SELECT 1 FROM moz_perms WHERE origin = ?\", (\"$url\",)).fetchone():
+    c.execute(\"INSERT INTO moz_perms (origin, type, permission, expireType, expireTime, modificationTime) VALUES (?, 'cookie', 1, 0, 0, $_EXEC_START)\", (\"$url\",))"
+        done)
+
+conn.commit()   # save (commit) the changes
+conn.close()    # close the connection
+EOF
+    fi
+
+    if [ -f ./permissions.sqlite ]; then
+        if [ -d "$_FFXDIR/$_FFXPRF" ]; then
+            mv ./permissions.sqlite "$_FFXDIR/$_FFXPRF" # move the newly created file to Firefox profile.
+        else
+            log_message "Failed to set cookies: directory '$_FFXDIR/$_FFXPRF' unavailable" 3
+            return 7
+        fi
+    else
+        log_message "Failed to set cookies: file 'permissions.sqlite' unavailable" 3
+    fi
+}
+
+ffx_profile() {
+    # Description:  Identifies the Firefox profile.
+    # Arguments:    None.
+    log_message "Identifying Firefox profile ..."
+
+    if [ -n "$_FFXPRF" ]; then
+        firefox -CreateProfile "$_FFXPRF-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
+        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*$_FFXPRF*" 2>&1)")
+        log_message "Firefox profile created for user $_FFXPRF" 1
+    elif [ -f "$_FFXDIR/profiles.ini" ]; then # identify profile directory, method #1
+        _FFXPRF=$(grep "[Default|Path]=.*\.default\-${channel}$" <"$_FFXDIR/profiles.ini" | cut -d= -f2 2>&1)
+        log_message "Default Firefox profile identified: $_FFXPRF" 1
+    elif [ -d "$_FFXDIR" ]; then
+        # Identify profile directory, method #2.
+        # useful when script re-launched after first run in the background,
+        # when Firefox doesn't append 'Default=1' to the [Profile0] section of 'profiles.ini' (method #1).
+        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
+        log_message "Firefox profile identified: $_FFXPRF" 1
+    elif [ -d "$_FFXDIR" ]; then # both attempts failed, create a new one
+        firefox -CreateProfile "default-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
+        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
+        log_message "Firefox profile created: $_FFXPRF" 1
+    else
+        log_message "Failed to create a profile. Skipping ..." 3
+        return 8
+    fi
+
+    # Run Firefox in the background to populate the profile directory with necessary files.
+    firefox --headless -P "default-$channel" 2>&1 | log_trace "[FFX]" &
+    sleep 3
+    killffx
+}
+
+ffx_xID() {
+    # Description:  Determines Firefox extension ID.
+    # Arguments:    One (1) - extension file (*.xpi).
+    local xid xpi
+
+    if [ $# -ne 1 ]; then
+        log_message "ERR: Wrong number of arguments for ${FUNCTION[0]}: $#" 3
+        return 49
+    fi
+
+    xpi="${1}"
+
+    # Fetch the ID from extension's manifest
+    keys=('applications' 'browser_specific_settings')
+    for key in "${keys[@]}"; do
+        xid=$(unzip -p "$xpi" manifest.json | jq -r '.'"$key"'.gecko.id' 2>&1)
+        if [ "$xid" != 'null' ]; then
+            echo "$xid"
+            return 0
+        fi
+    done
+
+    #log_message "Still trying, please wait ..."
+    if unzip -l "$xpi" | grep -q "cose.sig"; then
+        xid=$(unzip -p "$xpi" META-INF/cose.sig | strings | grep '0Y0')
+        if [ "$xid" != 'null' ]; then
+            xid=$(trimex "$xid")
+            echo "$xid"
+            return 0
+        fi
+    fi
+
+    #log_message "Final attempt, please wait ..."
+    if unzip -l "$xpi" | grep -q "mozilla.rsa"; then
+        xid=$(unzip -p "$xpi" META-INF/mozilla.rsa | openssl asn1parse -inform DER | grep -A 1 commonName | grep -o '{.*}')
+        if [ "$xid" != 'null' ]; then
+            xid=$(trimex "$xid")
+            echo "$xid"
+            return 0
+        fi
+    fi
+
+    return 50
+}
+
 finale() {
     # Description:  Prints out a message upon the completition of all the operations
     # Arguments:    None.
@@ -573,6 +783,47 @@ headline() {
     fi
 }
 
+isExternalDir() {
+    # Description:  Checks if the directory is on external drive.
+    # Argument:     One (1) - path to the directory represented as string.
+    # Rationale:    If the directory to be bookmarked is on the external drive
+    #               (see: _AUTODRIVES and "msc.automount_drives" in the user configuration file),
+    #               which has not been mounted, [ -d "$path" ] will simply fail.
+    #               Therefore, it is necessary to do this check before the directory is passed to `process_path()`.
+    #               It's also imperative that bookmarking of directories takes place after (!) mounting external drives.
+    local dir drive fstab
+
+    [ $# != 1 ] && return 62
+    dir="${1}"
+    fstab=$(</etc/fstab)
+
+    for drive in "${_AUTODRIVES[@]}"; do
+        if grep -iq "$drive" <<<"$dir" >/dev/null 2>&1 &&
+            grep -iq "$drive" <<<"$fstab" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+
+    return 63
+}
+
+isInstalled() {
+    # Description:  Checks if the Firefox exetnsion is installed.
+    # Arguments:    One (1) - exetnsion (XPI) file's name.
+    local arg xTitle xFile
+
+    arg="${1}"
+    for ext in "${_FFXEXTSLST[@]}"; do
+        xTitle="${ext%%\:*}"
+        xFile="${ext##*\:}"
+        if [ "$xTitle" == "$arg" ] && [ -f "$xFile" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 killffx() {
     # Description:  Kills Firefox, when necessary for certain operations; used in `set_firefox()`
     # Arguments:    None.
@@ -597,6 +848,7 @@ libreoffice_extensions() {
     fi
 
     if ! mkdir -p "$_LODIR"; then
+        log_message "Failed to create directory '$_LODIR'. Skipping ..." 3
         return 251
     fi
 
@@ -613,6 +865,7 @@ libreoffice_extensions() {
 
     for loextension in "${_LOEXTS[@]}"; do
         log_message "[+] Installing '$loextension' ..." 5
+        ((counter++))
         ext_total="${#_LOEXTS[@]}"
 
         case "$loextension" in
@@ -672,7 +925,6 @@ libreoffice_extensions() {
             ;;
         *)
             # Download and install other extensions
-            ((counter++))
             ext_title=$(curl -sfL "$_LOEXTSURL/$loextension" | awk -v RS='</h1>' '{gsub(/.*>/, ""); print $1}' | head -1)
             logstr="Downloading LibreOffice extension '$ext_title' ($counter/$ext_total) ..."
             log_message "$logstr" 4 "$_STRLEN"
@@ -865,46 +1117,6 @@ misc_bookmark_dirs() {
         while IFS= read -r line; do
             bookmarks["$line"]=1
         done <"$_GTKBKMRK"
-
-        isExternalDir() {
-            # Description:  Checks if the directory is on external drive.
-            # Argument:     One (1) - path to the directory represented as string.
-            # Rationale:    If the directory to be bookmarked is on the external drive
-            #               (see: _AUTODRIVES and "msc.automount_drives" in the user configuration file),
-            #               which has not been mounted, [ -d "$path" ] will simply fail.
-            #               Therefore, it is necessary to do this check before the directory is passed to `process_path()`.
-            #               It's also imperative that bookmarking of directories takes place after (!) mounting external drives.
-            local dir drive fstab
-
-            [ $# != 1 ] && return 62
-            dir="${1}"
-            fstab=$(</etc/fstab)
-
-            for drive in "${_AUTODRIVES[@]}"; do
-                if grep -iq "$drive" <<<"$dir" >/dev/null 2>&1 &&
-                    grep -iq "$drive" <<<"$fstab" >/dev/null 2>&1; then
-                    return 0
-                fi
-            done
-
-            return 63
-        }
-
-        process_path() {
-            local path="${1}"
-
-            if [ -d "$path" ] || isExternalDir "$path"; then
-                echo "$path"
-                if [[ -z ${bookmarks["file://${path}"]} ]]; then # the same path is not bookmarked already
-                    printf "%s\n" "file://${path}" >>"${_GTKBKMRK}"
-                    log_message "Bookmarked directory '$path'" 1
-                else
-                    log_message "Directory '$path' already bookmarked"
-                fi
-            else
-                log_message "Directory '$path' does not exist. Skipping ..."
-            fi
-        }
 
         for bdir in "${_BOOKDIRS[@]}"; do
             process_path "$bdir"
@@ -1201,6 +1413,21 @@ online() {
     _ENDMSG='true'
 }
 
+process_path() {
+    local path="${1}"
+
+    if [ -d "$path" ] || isExternalDir "$path"; then
+        if [[ -z ${bookmarks["file://${path}"]} ]]; then # the same path is not bookmarked already
+            printf "%s\n" "file://${path}" >>"${_GTKBKMRK}"
+            log_message "Bookmarked directory '$path'" 1
+        else
+            log_message "Directory '$path' already bookmarked"
+        fi
+    else
+        log_message "Directory '$path' does not exist. Skipping ..."
+    fi
+}
+
 restart() {
     # Description:  Restarts the system after system update and the successful completition of all the script operations.
     # Arguments:    None.
@@ -1353,17 +1580,15 @@ set_favourites() {
     # Try to find the associated launcher file for the favourite program
     log_message "Adding favourite programs to dock ..." 5
     for fav in "${_GFAVOURITES[@]}"; do
-        fav_="${fav%\ *}"
+        fav_="${fav%%\ *}" # retrieve the first word in favourite package's title
         if which "$fav_" >/dev/null 2>&1 || [[ $(dpkg -l | grep "$fav_") =~ ^ii.*"[$fav_]" ]]; then
             # Find and assign the launcher to a variable, if the names of launcher and favourite program match
             if [ -f "$_USERAPPS"/"$fav".desktop ] || [ -f /usr/share/applications/"$fav".desktop ]; then
                 dFile="$fav".desktop
-                echo "1 -- $dFile"
             else
-                # Otherwise, check the content of launcher files for similarities with favourite program's name
+                # Otherwise, check the content of the launcher file, if it matches the favourite package's title
                 dFile=$(grep -riE "(Name|Exec)=.*$fav" "$_USERAPPS"/*.desktop /usr/share/applications/*.desktop | grep -v 'daemon' | head -n 1)
                 dFile=$(basename "${dFile%\:*}")
-                echo "2 -- $dFile"
             fi
 
             # Create a comma-separated string to add to GSettings
@@ -1371,7 +1596,7 @@ set_favourites() {
                 settings+="'$dFile', "
             fi
         else
-            echo "$fav doesn't exist"
+            log_message "Failed to determine '$fav' on the system. Skipping ..." 3
         fi
     done
 
@@ -1390,101 +1615,8 @@ set_firefox() {
     # Arguments:    None.
     [[ "$_FFXCONFIG" != 1 ]] && return 6
     log_message "Setting up Firefox ..." 5
-    local channel counter ext_title ext_total ffv logstr url xid xpi_pathname xpiURL
+    local channel counter ext_title ext_total ffv logstr url xid ext_URL
     local arkenfox_files dbfile extension file UUID _XID tmpdir xpi
-
-    ffx_permissions() {
-        # Description:  Uses a Python script to interact with the SQLite database
-        # Arguments:    None.
-        if [ ${#_FFXCOOKIES[@]} -ne 0 ]; then
-            dbfile="permissions.sqlite"
-            python3 <<EOF
-import sqlite3
-
-conn = sqlite3.connect('$dbfile')   # connect to the SQLite database
-c = conn.cursor()                   # create a cursor object
-
-# Required by Firefox
-c.execute("PRAGMA user_version = 12;")
-c.execute("PRAGMA page_size = 32768;")
-c.execute("VACUUM;")
-
-# Create table moz_hosts
-c.execute('''CREATE TABLE IF NOT EXISTS moz_hosts
-             (id INTEGER PRIMARY KEY,
-              host TEXT,
-              type TEXT,
-              permission INTEGER,
-              expireType INTEGER,
-              expireTime INTEGER,
-              modificationTime INTEGER,
-              isInBrowserElement INTEGER)''')
-
-# Create table moz_perms
-c.execute('''CREATE TABLE IF NOT EXISTS moz_perms
-             (id INTEGER PRIMARY KEY,
-              origin TEXT UNIQUE,
-              type TEXT,
-              permission INTEGER,
-              expireType INTEGER,
-              expireTime INTEGER,
-              modificationTime INTEGER)''')
-
-# Insert a row of data
-$(for url in "${_FFXCOOKIES[@]}"; do
-                [ -n "$url" ] && echo "if not c.execute(\"SELECT 1 FROM moz_perms WHERE origin = ?\", (\"$url\",)).fetchone():
-    c.execute(\"INSERT INTO moz_perms (origin, type, permission, expireType, expireTime, modificationTime) VALUES (?, 'cookie', 1, 0, 0, $_EXEC_START)\", (\"$url\",))"
-            done)
-
-conn.commit()   # save (commit) the changes
-conn.close()    # close the connection
-EOF
-        fi
-
-        if [ -f ./permissions.sqlite ]; then
-            if [ -d "$_FFXDIR/$_FFXPRF" ]; then
-                mv ./permissions.sqlite "$_FFXDIR/$_FFXPRF" # move the newly created file to Firefox profile.
-            else
-                log_message "Failed to set cookies: directory '$_FFXDIR/$_FFXPRF' unavailable" 3
-                return 7
-            fi
-        else
-            log_message "Failed to set cookies: file 'permissions.sqlite' unavailable" 3
-        fi
-    }
-
-    ffx_profile() {
-        # Description:  Identifies the Firefox profile.
-        # Arguments:    None.
-        log_message "Identifying Firefox profile ..."
-
-        if [ -n "$_FFXPRF" ]; then
-            firefox -CreateProfile "$_FFXPRF-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
-            _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*$_FFXPRF*" 2>&1)")
-            log_message "Firefox profile created for user $_FFXPRF" 1
-        elif [ -f "$_FFXDIR/profiles.ini" ]; then # identify profile directory, method #1
-            _FFXPRF=$(grep "[Default|Path]=.*\.default\-${channel}$" <"$_FFXDIR/profiles.ini" | cut -d= -f2 2>&1)
-            log_message "Default Firefox profile identified: $_FFXPRF" 1
-        elif [ -d "$_FFXDIR" ]; then
-            # Identify profile directory, method #2.
-            # useful when script re-launched after first run in the background,
-            # when Firefox doesn't append 'Default=1' to the [Profile0] section of 'profiles.ini' (method #1).
-            _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
-            log_message "Firefox profile identified: $_FFXPRF" 1
-        elif [ -d "$_FFXDIR" ]; then # both attempts failed, create a new one
-            firefox -CreateProfile "default-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
-            _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
-            log_message "Firefox profile created: $_FFXPRF" 1
-        else
-            log_message "Failed to create a profile. Skipping ..." 3
-            return 8
-        fi
-
-        # Run Firefox in the background to populate the profile directory with necessary files.
-        firefox --headless -P "default-$channel" 2>&1 | log_trace "[FFX]" &
-        sleep 3
-        killffx
-    }
 
     # Firefox exists?
     if which firefox >/dev/null 2>&1 | log_trace "[FFX]"; then
@@ -1520,127 +1652,72 @@ EOF
         return 11
     fi
 
-    ffx_profile
-    ffx_permissions && log_message "Firefox persistent cookies set" 1 # create a custom file permissions.sqlite
+    ffx_profile                                                       # Determine Firefox profile
+    ffx_permissions && log_message "Firefox persistent cookies set" 1 # Create the file 'permissions.sqlite' to keep custom cookies
 
-    # Download and install extensions
     if [ -d "$_FFXDIR/$_FFXPRF" ]; then
-        if [ "${#_FFXEXTS[@]}" -ne 0 ]; then
-            if mkdir -p "$_FFXDIR/$_FFXPRF/extensions"; then # create extensions directory
-                tmpdir=$(mktemp -d)
-                ext_total="${#_FFXEXTS[@]}"
+        ffx_extensions # Download and install extensions
 
-                for extension in "${_FFXEXTS[@]}"; do
-                    # download extensions
-                    ((counter++))
-                    ext_title=$(curl -sfL "$_FFXADDONSURL/$extension" | grep -oP '<h1 class=\"AddonTitle\"(?:\s[^>]*)?>\K.*?(?=<)')
-                    logstr="Downloading Firefox extension '$ext_title' ($counter/$ext_total) ..."
-                    log_message "$logstr" 4 "$_STRLEN"
-                    xpiURL=$(curl -sfL "$_FFXADDONSURL/$extension" | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%:-]*.xpi")
-                    xpi_pathname="$tmpdir/$(basename "$xpiURL")"
-                    extension=$(basename "$xpi_pathname")
-
-                    if [ -z "$xpiURL" ]; then
-                        log_message "Extension '$ext_title' not found" 3
-                        continue
-                    else
-                        fetch_file "$xpiURL" "$extension" "$tmpdir"
-                    fi
-                done
-
-                # rename extensions by ID
-                for xpi in "$tmpdir"/*.xpi; do
-                    log_message "Trying to determine extension ID for $xpi ..."
-                    xid=$(unzip -p "${xpi}" manifest.json | jq -r '.applications.gecko.id' 2>&1) # 1st attempt using a regular Mozilla manifest
-
-                    if [ "${xid}" == 'null' ] && unzip -l "${xpi}" | grep -q "cose.sig"; then # 2nd attempt using file cose.sig
-                        log_message "Still trying to determine extension ID ..."
-                        xid=$(unzip -p "${xpi}" META-INF/cose.sig | strings | grep "0Y0")
-                    fi
-
-                    if [ "${xid}" == 'null' ] && unzip -l "${xpi}" | grep -q "mozilla.rsa"; then # 3rd attempt using file mozilla.rsa
-                        log_message "Final attempt to determine extension ID ..."
-                        xid=$(unzip -p "${xpi}" META-INF/mozilla.rsa | openssl asn1parse -inform DER | grep -A 1 commonName | grep -o '{.*}')
-                    fi
-
-                    if [ "${xid}" == 'null' ] && cp "$xpi" "$_BASEDIR"/data/firefox; then
-                        log_message "Failed to determine ID for extension '$xpi'. 
-    Please try to add the extension to Firefox manually from '$_BASEDIR/data/firefox'..." 3
-                        continue
-                    else
-                        _XID=$(trimex "$xid")
-                        log_message "Extension ID for '$xpi': $_XID"
-                    fi
-
-                    mv "$tmpdir/$(basename "$xpi")" "$tmpdir/${_XID}.xpi" 2>&1 | log_trace "[FFX]" # rename extension
-                    mv "$tmpdir/${_XID}.xpi" "$_FFXDIR/$_FFXPRF/extensions" >/dev/null 2>&1 &&
-                        log_message "Extension '$_XID.xpi' moved to profile $_FFXPRF" 1 # move extension to user profile
-                done
-            else
-                log_message "Failed to create extensions directory for '$_FFXPRF'"
-            fi
-
-            # Copy user's contents to Firefox profile
-            if [ -d "$_BASEDIR"/data/firefox ]; then
-                cp -a "$_BASEDIR"/data/firefox/. "$_FFXDIR/$_FFXPRF"
-            fi
-
-            # Determine and Set UUID for GroupSpeedDial: this is a private case to ensure consistency between prefs.js and user-overrides.js
-            # Otherwise (after running the Arkenfox stuff) the homepage fails to load GlobalSpeedDial also because the extension UUID values
-            # are assigned/changed automatically by Firefox with each extension installation.
-            #
-            # run in the background again to add extension UUIDs to prefs.js
-            if [ "$_FFXHOMEPAGE" -eq 1 ]; then
-                firefox --headless -P "$(basename "$_FFXPRF" | cut -d\. -f2)" 2>&1 | log_trace "[FFX]" &
-                sleep 7
-                killffx
-
-                if [ -f "$_FFXDIR/$_FFXPRF/$_FFXPREFS" ] && [ -f "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" ]; then
-                    # Extract UUID from 'prefs.js'
-                    UUID=$(grep -oP '(?<="admin@fastaddons\.com_GroupSpeedDial\\"\:\\")[^"\\]+' "$_FFXDIR/$_FFXPRF/$_FFXPREFS")
-
-                    # Check for UUID
-                    if [ -z "$UUID" ]; then
-                        log_message "UUID not found in '$_FFXPREFS'. Skipping ..." 3
-                    else
-                        # Replace the UUID in user-overrides.js
-                        sed -i "/browser\.startup\.homepage/c\user_pref\(\"browser\.startup\.homepage\"\,\ \"moz-extension\:\/\/$UUID\/dial\.html\"\);" "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" &&
-                            log_message "UUID replaced successfully in '$_FFXUSEROVERRIDES'" 1
-                    fi
-                else
-                    log_message "Preference files are missing. Skipping ..." 3
-                fi
-            fi
-        else
-            log_message "No extensions to install. Skipping ..." 3
-            return 12
+        # Copy user's contents to Firefox profile
+        if [ -d "$_BASEDIR"/data/firefox ]; then
+            cp -a "$_BASEDIR"/data/firefox/. "$_FFXDIR/$_FFXPRF"
         fi
 
-        # Set Arkenfox stuff
-        if [ "$_FFXPRIVACY" -eq 1 ]; then
-            if [ -f "$_FFXDIR/$_FFXPRF/user-overrides.js" ]; then
-                declare -a arkenfox_files=(updater.sh prefsCleaner.sh user.js)
+        # Determine and Set UUID for GroupSpeedDial: this is a private case to ensure consistency between prefs.js and user-overrides.js
+        # Otherwise (after running the Arkenfox stuff) the homepage fails to load GlobalSpeedDial also because the extension UUID values
+        # are assigned/changed automatically by Firefox with each extension installation.
+        #
+        # run in the background again to add extension UUIDs to prefs.js
+        if [ "$_FFXHOMEPAGE" -eq 1 ]; then
+            firefox --headless -P "$(basename "$_FFXPRF" | cut -d\. -f2)" 2>&1 | log_trace "[FFX]" &
+            sleep 7
+            killffx
 
-                for file in "${arkenfox_files[@]}"; do
-                    url="https://raw.githubusercontent.com/arkenfox/user.js/master/$file"
-                    fetch_file "$url" "" "$_FFXDIR/$_FFXPRF" && log_message "Downloaded '$file' to '$_FFXDIR/$_FFXPRF'" 1
-                done
+            if [ -f "$_FFXDIR/$_FFXPRF/$_FFXPREFS" ] && [ -f "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" ]; then
+                # Extract UUID from 'prefs.js'
+                UUID=$(grep -oP '(?<="admin@fastaddons\.com_GroupSpeedDial\\"\:\\")[^"\\]+' "$_FFXDIR/$_FFXPRF/$_FFXPREFS")
 
-                # Set permissions to user preference files
-                cd "$_FFXDIR/$_FFXPRF" || return 33
-                if [ -f "./updater.sh" ]; then
-                    chmod +x "./updater.sh"
-                    bash "./updater.sh" 2>&1 | log_trace "[FFX]"
+                # Check for UUID
+                if [ -z "$UUID" ]; then
+                    log_message "UUID not found in '$_FFXPREFS'. Skipping ..." 3
                 else
-                    log_message "File ./updater.sh cannot be executed" 3
+                    # Replace the UUID in user-overrides.js
+                    sed -i "/browser\.startup\.homepage/c\user_pref\(\"browser\.startup\.homepage\"\,\ \"moz-extension\:\/\/$UUID\/dial\.html\"\);" "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" &&
+                        log_message "UUID replaced successfully in '$_FFXUSEROVERRIDES'" 1
                 fi
+            else
+                log_message "Preference files are missing. Skipping ..." 3
+            fi
+        fi
+    else
+        log_message "No extensions to install. Skipping ..." 3
+        return 12
+    fi
 
-                if [ -f "./prefsCleaner.sh" ]; then
-                    chmod +x "./prefsCleaner.sh"
-                    bash "./prefsCleaner.sh" 2>&1 | log_trace "[FFX]"
-                else
-                    log_message "File ./prefsCleaner.sh cannot be executed" 3
-                fi
+    # Set Arkenfox stuff
+    if [ "$_FFXPRIVACY" -eq 1 ]; then
+        if [ -f "$_FFXDIR/$_FFXPRF/user-overrides.js" ]; then
+            declare -a arkenfox_files=(updater.sh prefsCleaner.sh user.js)
+
+            for file in "${arkenfox_files[@]}"; do
+                url="https://raw.githubusercontent.com/arkenfox/user.js/master/$file"
+                fetch_file "$url" "" "$_FFXDIR/$_FFXPRF" && log_message "Downloaded '$file' to '$_FFXDIR/$_FFXPRF'" 1
+            done
+
+            # Set permissions to user preference files
+            cd "$_FFXDIR/$_FFXPRF" || return 33
+            if [ -f "./updater.sh" ]; then
+                chmod +x "./updater.sh"
+                bash "./updater.sh" 2>&1 | log_trace "[FFX]"
+            else
+                log_message "File ./updater.sh cannot be executed" 3
+            fi
+
+            if [ -f "./prefsCleaner.sh" ]; then
+                chmod +x "./prefsCleaner.sh"
+                bash "./prefsCleaner.sh" 2>&1 | log_trace "[FFX]"
+            else
+                log_message "File ./prefsCleaner.sh cannot be executed" 3
             fi
         fi
     else
@@ -1753,7 +1830,11 @@ set_gsettings() {
     if [ ${#_GSETTINGS[@]} -gt 0 ]; then
         log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
         for setting in "${_GSETTINGS[@]}"; do
-            IFS=' ' read -r schema key value <<<"$setting"                   # populate keys with values from the array
+            IFS=' ' read -r schema key value <<<"$setting" # populate keys with values from the array
+            if [ "$key" == 'scrollback-unlimited' ]; then
+                #        eval "e_setting=\"$setting\""
+                echo "$setting" "$schema"
+            fi
             gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "[GST]" # set the key/value pairs
         done
 
@@ -1802,13 +1883,14 @@ set_portables() {
         "ImageMagick;imagemagick;https://api.github.com/repos/ImageMagick/ImageMagick/releases/latest;$jqcmd"
         'Inkscape;inkscape;https://inkscape.org/release/all/gnulinux/appimage;grep -iP "\>inkscape.*\.appimage" | cut -d\" -f2 | tail -1 | sed "s/^/https:\/\/inkscape\.org/"'
         "KeePassXC;keepassxc;https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest;$jqcmd"
-        "MuseScore;musescore;https://musescore.org/en/download/musescore-x86_64.AppImage;n/a"
+        'Krita;krita;https://krita.org/en/download/;grep -ioP "\<a href\=https://download.kde.org/stable/krita/\d\.\d\.\d\/krita-.*-x86_64.appimage" | cut -d\= -f2 | tail -1'
+        'MuseScore;musescore;https://musescore.org/en/download/musescore-x86_64.AppImage;grep -ioP "https.*appimage" | tail -1'
         "Neofetch;neofetch;https://raw.githubusercontent.com/hykilpikonna/hyfetch/master/neofetch;n/a"
         'QBittorrent;qbittorrent;https://www.qbittorrent.org/download.php;grep -P ".*sourceforge.*\d_x86_64\.AppImage\/download" | cut -d\" -f4 | head -1'
         "SMPlayer;smplayer;https://api.github.com/repos/smplayer-dev/smplayer/releases/latest;$jqcmd"
         "SQLite Browser;sqlitebrowser;https://api.github.com/repos/sqlitebrowser/sqlitebrowser/releases/latest;$jqcmd"
         "Styli.sh;stylish;https://raw.githubusercontent.com/thevinter/styli.sh/master/styli.sh;n/a"
-        'VSCodium;vscodium;https://api.github.com/repos/VSCodium/vscodium/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "vscodium\-linux\-x64.*tar.gz$"'
+        'VSCodium;codium;https://api.github.com/repos/VSCodium/vscodium/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "vscodium\-linux\-x64.*tar.gz$"'
         "XnView;xnview;https://download.xnview.com/XnView_MP.glibc2.17-x86_64.AppImage;n/a"
         "Xournal++;xournalpp;https://api.github.com/repos/xournalpp/xournalpp/releases/latest;$jqcmd"
         'YT-DLP;ytdlp;https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "yt-dlp$"'
@@ -1856,8 +1938,7 @@ set_portables() {
                 # Download the package and extract, if necessary
                 if [ -n "$full_url" ]; then
                     fetch_file "$full_url" "$filename" "$_APPSDIR"
-                    # skip extraction, if file exists
-                    [ $? != 44 ] && tar_extractor "$_APPSDIR/$filename" "$filename" "$_APPSDIR" 2>/dev/null
+                    [ $? != 44 ] && tar_extractor "$_APPSDIR/$filename" "$filename" "$_APPSDIR" 2>/dev/null # skip extraction, if file exists
                 else
                     log_message "Cannot download '$name'. Skipping ..." 3
                     continue
@@ -1908,21 +1989,7 @@ set_portables() {
     done
 
     # Download and install VS Codium extensions
-    codium_dir="$_APPSDIR"/vscodium/bin
-    extensions_dir="$_APPSDIR"/vscodium/data/extensions
-    if [ "${#_VSIX[@]}" -ne 0 ] && [ -f "$codium_dir"/codium ] && chmod +x "$codium_dir"/codium; then
-        # Update 'product.json' before installing extensions
-        if ! vsc_patcher >/dev/null 2>&1 | log_trace "[VSC]"; then
-            log_message "You may need to install some of the VS Codium extensions manually" 3
-        fi
-
-        # Install extensions
-        for extension in "${_VSIX[@]}"; do
-            log_message "[+] Installing VS Codium extension '$extension'" 5
-            [ -d "$extensions_dir" ] && "$codium_dir"/codium --extensions-dir "$extensions_dir" 2>&1 | log_trace "[VSC]"
-            "$codium_dir"/codium --install-extension "$extension" --force 2>&1 | log_trace "[VSC]"
-        done
-    fi
+    vsc_extensions
 
     # set user and group permissions
     dirs="$_APPSDIR $_USERAPPS $_USERICONS/hicolor/scalable/apps"
@@ -2431,7 +2498,7 @@ system_update() {
     fi
 
     # Remove unnecessary packages
-    sudo apt-get autoremove 2>&1 | log_trace "[APT]"
+    sudo apt-get autoremove -y 2>&1 | log_trace "[APT]"
 
     # disable Ubuntu advantage tools
     # source: https://askubuntu.com/a/1452520
@@ -2454,7 +2521,7 @@ tar_extractor() {
 
     # Check the number of supplied arguments
     [ $# -eq 0 ] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument: $#" 2 && return 34
-    [ $# -gt 0 ] && [ $# -lt 3 ] && log_message "ERR: Insufficient arguments for ${FUNCNAME[0]}: $#" 3
+    [ $# -gt 0 ] && [ $# -lt 3 ] && log_message "WRN: Insufficient arguments for ${FUNCNAME[0]}: $#" 3
 
     # Check if argument ${1} is a valid archive file, then
     # exit the function, if not
@@ -2468,7 +2535,7 @@ tar_extractor() {
     done
 
     if [[ $isArchive = 'false' ]]; then
-        log_message "ERR: ${FUNCNAME[0]} \${1} not a valid archive: $appfile" 3
+        log_message "ERR: ${FUNCNAME[0]} \${1} not a valid archive: $appfile" 2
         return 35
     fi
 
@@ -2476,7 +2543,7 @@ tar_extractor() {
     # convert to a valid one, if necessary, then
     # replace with the default one, if missing
     if [[ ! "${2}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-        log_message "ERR: ${FUNCNAME[0]} \${2} not a valid file/directory name: ${2}" 3
+        log_message "WRN: ${FUNCNAME[0]} \${2} not a valid file/directory name: ${2}" 3
         # shellcheck disable=SC2001
         appname=$(echo "${2}" | sed 's/[^a-zA-Z0-9._-]/_/g')
     fi
@@ -2485,7 +2552,7 @@ tar_extractor() {
 
     # Check if the 3rd argument is a valid directory
     if [ ! -d "${3}" ]; then
-        log_message "ERR: ${FUNCNAME[0]} \${2} not a valid directory: ${3}" 3
+        log_message "WRN: ${FUNCNAME[0]} \${2} not a valid directory: ${3}" 3
     fi
 
     loc="${3:-$_BASEDIR}"
@@ -2544,7 +2611,11 @@ timer() {
 trimex() {
     # Description:  Trims the title of a Firefox extension.
     # Arguments:    One (1) - title of the extension to be trimmed.
-    [ $# -ne 1 ] && log_message "ERR: Wrong number of arguments for '${FUNCNAME[0]}': $#" 3
+    if [ $# -ne 1 ]; then
+        log_message "ERR: Wrong number of arguments for '${FUNCNAME[0]}': $#" 3
+        return 63
+    fi
+
     local val
 
     val="${1}"
@@ -2586,13 +2657,48 @@ user_consent() {
     done
 }
 
+vsc_extensions() {
+    # Description:  Downloads and sets up VS Codium extensions.
+    # Arguments:    None.
+    local codium_dir extensions_dir
+
+    if [ ! -d "$_APPSDIR"/codium ]; then
+        log_message "VS Codium is not available. Skipping ..." 3 && return 55
+    fi
+
+    if [ "${#_VSIX[@]}" -eq 0 ]; then
+        log_message "No VS Codium extensions to install. Skipping ..." 3 && return 56
+    fi
+
+    codium_dir="$_APPSDIR"/codium/bin
+    extensions_dir="$_APPSDIR"/codium/data/extensions # Set the extensions directory explicitly. Otherwise, installs into ~/.vscode-oss/extensions.
+    if mkdir -p "$extensions_dir"; then
+        if [ -f "$codium_dir"/codium ] && chmod +x "$codium_dir"/codium; then
+            # Update 'product.json' before installing extensions
+            if ! vsc_patcher >/dev/null 2>&1 | log_trace "[VSC]"; then
+                log_message "You may need to install some of the VS Codium extensions manually" 3
+            fi
+
+            # Install extensions
+            for extension in "${_VSIX[@]}"; do
+                log_message "[+] Installing VS Codium extension '$extension'" 5
+                "$codium_dir"/codium --install-extension "$extension" --force 2>&1 | log_trace "[VSC]"
+            done
+        else
+            log_message "Required executable 'codium' is missing. Skipping ..." && return 57
+        fi
+    else
+        log_message "Failed to install VS Codium extensions. Skipping ..." 3 && return 58
+    fi
+}
+
 vsc_patcher() {
     # Description:  Patches VS Codium 'product.json' to allow downloading from Microsoft Marketplace.
     # Arguments:    None.
     local new_cacheUrl new_itemUrl new_nameLong new_nameShort new_serviceUrl product_json product_bak tmpfile
 
-    product_json="$_APPSDIR"/vscodium/resources/app/product.json
-    product_bak="$_APPSDIR"/vscodium/resources/app/product.bak
+    product_json="$_APPSDIR"/codium/resources/app/product.json
+    product_bak="$_APPSDIR"/codium/resources/app/product.bak
     tmpfile=$(mktemp)
 
     # Check if file exists
@@ -2740,6 +2846,7 @@ main() {
         system_update
         screenlock
         echo
+        finale
         restart
     fi
 

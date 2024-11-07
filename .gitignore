@@ -1,5 +1,9 @@
 .cspell/
 .vscode/
+data/configs
+data/configsp
+data/dotfiles
+data/firefox
 poppi-old.sh
 test-ground.sh
 *.code-workspace
