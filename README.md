@@ -322,7 +322,7 @@ This section provides a number of options for setting and configuring portable a
   "bleachbit": {
     "required": "0"
   },
-  "vscodium": {
+  "codium": {
     "required": "1",
     "extensions": [
       "arcticicestudio.nord-visual-studio-code",
@@ -721,6 +721,7 @@ Always run the script as **user**.
 | [ImageMagick][]       | imagemagick   |
 | [Inkscape][]          | inkscape      |
 | [KeePassXC][]         | keepassxc     |
+| [Krita][]             | krita         |
 | [LibreOffice][]       | libreoffice   |
 | [lmsensors][]         | lmsensors     |
 | [MuseScore][]         | musescore     |
@@ -732,7 +733,7 @@ Always run the script as **user**.
 | [Styli.sh][]          | stylish       |
 | [TeamViewer][]        | teamviewer    |
 | [Virt-Manager][]      | virt-manager  |
-| [VS Codium][]         | vscodium      |
+| [VS Codium][]         | codium        |
 | [XnViewMP][]          | xnview        |
 | [Xournal++][]         | xournalpp     |
 | [YouTube DLP][]       | ytdlp         |
@@ -759,6 +760,7 @@ Always run the script as **user**.
 [ImageMagick]: https://www.imagemagick.org/
 [Inkscape]: https://inkscape.org/
 [KeePassXC]: https://keepassxc.org/
+[Krita]: https://krita.org/
 [LibreOffice]: https://www.libreoffice.org/download/download-libreoffice/
 [lmsensors]: https://github.com/lm-sensors/lm-sensors
 [MuseScore]: https://musescore.org/
