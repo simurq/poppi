@@ -19,7 +19,7 @@ __init_logfile() {
     # Description:  Creates a log file for this script and manages its backups.
     # Arguments:    None.
     # Output:       File(s) 'poppi[_ddmmYYYY|YYYYmmdd]_HHmmss.log' in the script directory.
-    local bool_created_logfile fmt log_files oldlog total_logs
+    local isLogfile fmt log_files oldlog total_logs
 
     # Continue, only if the global variable is set to 'true', or equals one (1)
     [[ "$_LOGFILEON" = 0 ]] && return 1
@@ -27,7 +27,7 @@ __init_logfile() {
     # Create a log file
     if ! [[ -f "$_LOGFILE"'.log' ]]; then
         if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            bool_created_logfile="true"
+            isLogfile="true"
         else
             log_and_exit "Failed to create a logfile!" 2
         fi
@@ -36,8 +36,8 @@ __init_logfile() {
     # Check if the log file is writable and exit on failure
     if [[ -w "$_LOGFILE"'.log' ]]; then
         if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            _FILELOGGER_ACTIVE="true"
-            [[ $bool_created_logfile == "true" ]] && log_message "Created log file: $_LOGFILE.log" 1
+            _FILELOGGER_ACTIVE='true'
+            [[ $isLogfile == 'true' ]] && log_message "Created log file: $_LOGFILE.log" 1
             log_message "Logging initialised" 1
         else
             _FILELOGGER_ACTIVE="false"
@@ -342,7 +342,7 @@ __logger_core() {
         printf "\r%s%s%s %s %s\r" "${lvl_color}" "${lvl_prefix}" "${lvl_sym}" "${lvl_msg}" "${lvl_nc}" # progress reports on the same line ('\r')
     fi
 
-    if [[ $_FILELOGGER_ACTIVE == "true" ]]; then
+    if [[ $_FILELOGGER_ACTIVE == 'true' ]]; then
         printf "%s %-25s %-10s %s\n" "${lvl_ts}" "${FUNCNAME[2]}" "[${lvl_str}]" "$lvl_msg" >>"$_LOGFILE"'.log'
     fi
 }
@@ -522,9 +522,9 @@ fetch_file() {
                     log_message "Downloading '$filename' ... $(bytes_to_human "$filesize") ($percentage%)" 4 "$_STRLEN"
                 else
                     log_message "Downloading '$filename' ... $(bytes_to_human "$filesize")" 4 "$_STRLEN"
-                    if [ "$prevsize" == "$filesize" ]; then
+                    if [ "$prevsize" -eq "$filesize" ]; then
                         ((k++))
-                        if [ "$k" == 3 ]; then break; fi
+                        if [ "$k" -eq 3 ]; then break; fi
                     fi
                     prevsize="$filesize"
                 fi
@@ -1004,7 +1004,7 @@ log_trace() {
 
     prompt_active=false
     while true; do
-        if [[ "$prompt_active" == "false" ]]; then
+        if [[ "$prompt_active" == 'false' ]]; then
             IFS= read -r -t1 line
             errcode=$?
         else
@@ -1825,21 +1825,21 @@ set_gsettings() {
     # Arguments:    None.
     # Discussion: https://www.reddit.com/r/gnome/comments/vz37z2
     # Custom keybindings: https://www.suse.com/support/kb/doc/?id=000019319
+    [ ${#_GSETTINGS[@]} -eq 0 ] && return 66
     local key schema setting value
 
-    if [ ${#_GSETTINGS[@]} -gt 0 ]; then
-        log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
-        for setting in "${_GSETTINGS[@]}"; do
-            IFS=' ' read -r schema key value <<<"$setting" # populate keys with values from the array
-            if [ "$key" == 'scrollback-unlimited' ]; then
-                #        eval "e_setting=\"$setting\""
-                echo "$setting" "$schema"
-            fi
-            gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "[GST]" # set the key/value pairs
-        done
+    log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
+    for setting in "${_GSETTINGS[@]}"; do
+        # Expand the variables in JSON data, if any
+        if [[ $setting == *'$'* ]]; then
+            setting=$(eval echo "\"$setting\"")
+        fi
 
-        log_message "GNOME settings set" 1
-    fi
+        IFS=' ' read -r schema key value <<<"$setting"                   # populate keys with values from the array
+        gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "[GST]" # set the key/value pairs
+    done
+
+    log_message "GNOME settings set" 1
 }
 
 set_permission() {
@@ -2768,13 +2768,14 @@ main() {
 
     # Check the arguments
     # At least one, but not more than two arguments are required
-    if [[ $# -lt 1 || $# -gt 2 ]]; then
+    if [[ $# -eq 0 || $# -gt 2 ]]; then
         display_usage
         return 1
     fi
 
     for arg in "$@"; do
-        if [[ $arg =~ ^-[abcdfghprvx]$ ]]; then
+        if [[ $arg =~ ^-[abcdfghprvx]$ ||
+            $arg =~ ^--(all|bookmark|connect|dock|firefox|gnome-extensions|help|set-gsettings|set-portables|set-repos|version)$ ]]; then
             _OPTION=$arg
         elif [[ -f $arg ]]; then
             _CONFIG_FILE=$arg
