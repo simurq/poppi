@@ -226,7 +226,7 @@ __load_configs() {
         fi
     done
 
-    # Extract and assign values to global variables
+    # Extract and assign values to global colour variables
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CHEAD" '.GENERAL."gen.colour_head" // $default') && _CHEAD=$(set_colour "$usrVal" "$_CHEAD")
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CINFO" '.GENERAL."gen.colour_info" // $default') && _CINFO=$(set_colour "$usrVal" "$_CINFO")
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_COKAY" '.GENERAL."gen.colour_okay" // $default') && _COKAY=$(set_colour "$usrVal" "$_COKAY")
@@ -1467,25 +1467,25 @@ screenlock() {
 }
 
 set_colour() {
-    # Description:  Converts colour values provided in RGB and Hex to Bash's ANSI format
+    # Description:  Converts RGB and Hex colours to ANSI format used in Bash
     # Arguments:    Two (2)
     #   -- User colour
     #   -- Fallback colour
-    local char char1 char2 clr defClr hex i pos pos1 pos2 tmpClr usrClr
-
     [[ $# -eq 0 ]] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument" 2 && return 4
-    local usrClr="${1}"
-    local defClr="${2}"
-    local hex='0123456789abcdef'
-    local char=';'
-    local clr=''
 
-    usrClr=${usrClr,,}                    # convert input to lowercase
-    if [[ "$usrClr" == *"$char"* ]]; then # check for default value
+    local char char1 char2 clr defClr hex i pos pos1 pos2 sc tmpClr usrClr
+    usrClr="${1}"
+    defClr="${2}"
+    hex='0123456789abcdef'
+    sc=';'
+    clr=''
+
+    usrClr=${usrClr,,}                  # convert input to lowercase
+    if [[ "$usrClr" == *"$sc"* ]]; then # check for default value
         echo -e "$usrClr"
         return 0
     elif [[ "$usrClr" =~ ^[r][g][b]\(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\,([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\,([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\)$ ]]; then # regex pattern to check the RGB value
-        usrClr="${usrClr#*\(}" && usrClr="${usrClr%\)*}" && usrClr="${usrClr//,/;}"                                                                                                                         # convert user value to 'semi-ANSI' format
+        usrClr="${usrClr#*\(}" && usrClr="${usrClr%\)*}" && usrClr="${usrClr//,/$sc}"                                                                                                                       # convert user value to 'semi-ANSI' format
         clr="$usrClr"
     elif [[ "$usrClr" =~ ^\#([a-f0-9]{6}|[a-f0-9]{3})$ ]]; then # regex pattern to check the 3- or 6-char hex value
         if [[ "${#usrClr}" -eq 4 ]]; then                       # hex shorthand, i.e., #1a3
@@ -1493,7 +1493,7 @@ set_colour() {
                 char="${usrClr:$i:1}"                  # determine the char
                 pos="${hex%"$char"*}" && pos="${#pos}" # determine char position/index in $hex
                 tmpClr=$((pos * 16 + pos))             # convert to RGB value
-                clr=${clr}';'$tmpClr                   # concatenate the string
+                clr=${clr}${sc}${tmpClr}               # concatenate the string
             done
         else
             for ((i = 1; i <= 6; i += 2)); do # hex full, i.e., #12ab34
@@ -1502,7 +1502,7 @@ set_colour() {
                 pos1="${hex%"$char1"*}" && pos1="${#pos1}"
                 pos2="${hex%"$char2"*}" && pos2="${#pos2}"
                 tmpClr=$((pos1 * 16 + pos2))
-                clr=${clr}';'$tmpClr
+                clr=${clr}${sc}${tmpClr}
             done
         fi
         clr=${clr#*;} # remove the leading semi-colon
@@ -1878,10 +1878,12 @@ set_portables() {
         "Audacity;audacity;https://api.github.com/repos/audacity/audacity/releases/latest;$jqcmd"
         'Bleachbit;bleachbit;https://api.github.com/repos/bleachbit/bleachbit/releases/latest;grep 'tarball_url' | cut -d\" -f4'
         "CPU-X;cpux;https://api.github.com/repos/X0rg/CPU-X/releases/latest;$jqcmd"
+        "cURL;curl;https://api.github.com/repos/moparisthebest/static-curl/releases/latest;jq -r '.assets[].browser_download_url' | grep 'curl-amd64'"
         'DeadBeef;deadbeef;https://sourceforge.net/projects/deadbeef/files/travis/linux/master/;grep -oP "https.*deadbeef-static.*bz2/download" | head -1'
         "HW-Probe;hwprobe;https://api.github.com/repos/linuxhw/hw-probe/releases/latest;$jqcmd"
         "ImageMagick;imagemagick;https://api.github.com/repos/ImageMagick/ImageMagick/releases/latest;$jqcmd"
         'Inkscape;inkscape;https://inkscape.org/release/all/gnulinux/appimage;grep -iP "\>inkscape.*\.appimage" | cut -d\" -f2 | tail -1 | sed "s/^/https:\/\/inkscape\.org/"'
+        "jq;jq;https://api.github.com/repos/jqlang/jq/releases/latest;jq -r '.assets[].browser_download_url' | grep 'jq-linux-amd64'"
         "KeePassXC;keepassxc;https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest;$jqcmd"
         'Krita;krita;https://krita.org/en/download/;grep -ioP "\<a href\=https://download.kde.org/stable/krita/\d\.\d\.\d\/krita-.*-x86_64.appimage" | cut -d\= -f2 | tail -1'
         'MuseScore;musescore;https://musescore.org/en/download/musescore-x86_64.AppImage;grep -ioP "https.*appimage" | tail -1'
@@ -2657,6 +2659,25 @@ user_consent() {
     done
 }
 
+# shellcheck disable=SC2190
+validate_json() {
+    local json_file json_keys
+
+    if [ $# -ne 1 ]; then
+        log_and_exit "ERR: Wrong number of arguments for '${FUNCTION[0]}'." 78
+    fi
+
+    json_file="$1"
+    declare -a json_keys=(GENERAL GENERAL.\"gen.colour_head\" GENERAL.\"gen.colour_info\" GENERAL.\"gen.colour_okay\" GENERAL.\"gen.colour_stop\" GENERAL.\"gen.colour_warn\" GENERAL.\"gen.logfile_backup_no\" GENERAL.\"gen.logfile_format\" GENERAL.\"gen.logfile_on\" GENERAL.\"gen.maximise_window\" GENERAL.\"gen.set_timer\" GENERAL.\"gen.test_server\" FIREFOX FIREFOX.\"ffx.configure\" FIREFOX.\"ffx.cookies_to_keep\" FIREFOX.\"ffx.extensions\" FIREFOX.\"ffx.profile\" FIREFOX.\"ffx.set_homepage\" FIREFOX.\"ffx.set_privacy\" PACKAGES PACKAGES.\"pkg.autostart\" PACKAGES.\"pkg.installers\" PACKAGES.\"pkg.installers\".Calibre PACKAGES.\"pkg.installers\".Calibre.required PACKAGES.\"pkg.installers\".\"DConf-Editor\" PACKAGES.\"pkg.installers\".\"DConf-Editor\".required PACKAGES.\"pkg.installers\".FFMPEG_s PACKAGES.\"pkg.installers\".FFMPEG_s.required PACKAGES.\"pkg.installers\".FSearch PACKAGES.\"pkg.installers\".FSearch.required PACKAGES.\"pkg.installers\".LibreOffice PACKAGES.\"pkg.installers\".LibreOffice.required PACKAGES.\"pkg.installers\".LibreOffice.extensions PACKAGES.\"pkg.installers\".lmsensors PACKAGES.\"pkg.installers\".lmsensors.required PACKAGES.\"pkg.installers\".pdftocgen PACKAGES.\"pkg.installers\".pdftocgen.required PACKAGES.\"pkg.installers\".TeamViewer PACKAGES.\"pkg.installers\".TeamViewer.required PACKAGES.\"pkg.installers\".\"Virt-Manager\" PACKAGES.\"pkg.installers\".\"Virt-Manager\".required PACKAGES.\"pkg.portables\" PACKAGES.\"pkg.portables\".audacity PACKAGES.\"pkg.portables\".audacity.required PACKAGES.\"pkg.portables\".bleachbit PACKAGES.\"pkg.portables\".bleachbit.required PACKAGES.\"pkg.portables\".cpux PACKAGES.\"pkg.portables\".cpux.required PACKAGES.\"pkg.portables\".curl PACKAGES.\"pkg.portables\".curl.required PACKAGES.\"pkg.portables\".deadbeef PACKAGES.\"pkg.portables\".deadbeef.required PACKAGES.\"pkg.portables\".hwprobe PACKAGES.\"pkg.portables\".hwprobe.required PACKAGES.\"pkg.portables\".imagemagick PACKAGES.\"pkg.portables\".imagemagick.required PACKAGES.\"pkg.portables\".inkscape PACKAGES.\"pkg.portables\".inkscape.required PACKAGES.\"pkg.portables\".jq PACKAGES.\"pkg.portables\".jq.required PACKAGES.\"pkg.portables\".keepassxc PACKAGES.\"pkg.portables\".keepassxc.required PACKAGES.\"pkg.portables\".krita PACKAGES.\"pkg.portables\".krita.required PACKAGES.\"pkg.portables\".musescore PACKAGES.\"pkg.portables\".musescore.required PACKAGES.\"pkg.portables\".neofetch PACKAGES.\"pkg.portables\".neofetch.required PACKAGES.\"pkg.portables\".qbittorrent PACKAGES.\"pkg.portables\".qbittorrent.required PACKAGES.\"pkg.portables\".smplayer PACKAGES.\"pkg.portables\".smplayer.required PACKAGES.\"pkg.portables\".sqlitebrowser PACKAGES.\"pkg.portables\".sqlitebrowser.required PACKAGES.\"pkg.portables\".stylish PACKAGES.\"pkg.portables\".stylish.required PACKAGES.\"pkg.portables\".codium PACKAGES.\"pkg.portables\".codium.required PACKAGES.\"pkg.portables\".codium.extensions PACKAGES.\"pkg.portables\".codium.settings PACKAGES.\"pkg.portables\".codium.settings.nameShort PACKAGES.\"pkg.portables\".codium.settings.nameLong PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.serviceUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.cacheUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.itemUrl PACKAGES.\"pkg.portables\".xnview PACKAGES.\"pkg.portables\".xnview.required PACKAGES.\"pkg.portables\".xournalpp PACKAGES.\"pkg.portables\".xournalpp.required PACKAGES.\"pkg.portables\".ytdlp PACKAGES.\"pkg.portables\".ytdlp.required PACKAGES.\"pkg.portables_dir\" MISCOPS MISCOPS.\"msc.automount_drives\" MISCOPS.\"msc.avatar_enable\" MISCOPS.\"msc.avatar_image\" MISCOPS.\"msc.bookmarked_dirs\" MISCOPS.\"msc.crontab_cmds\" MISCOPS.\"msc.gnome_calc_functions\" MISCOPS.\"msc.gnome_extensions\" MISCOPS.\"msc.gnome_extension_settings\" MISCOPS.\"msc.gnome_favourites\" MISCOPS.\"msc.gnome_settings\" MISCOPS.\"msc.ms_fonts\" MISCOPS.\"msc.set_geary\" MISCOPS.\"msc.volume_overamplify\" MISCOPS.\"msc.wallpaper_on\" MISCOPS.\"msc.wallpaper_src_dir\" MISCOPS.\"msc.wallpaper_ext_dir\" MISCOPS.\"msc.week_starts_on_monday\")
+    for key in "${json_keys[@]}"; do
+        if ! jq -e ".${key} // empty" "$json_file" >/dev/null; then
+            log_and_exit "Not a valid configuration file. Exiting ..." 79
+        fi
+    done
+
+    return 0
+}
+
 vsc_extensions() {
     # Description:  Downloads and sets up VS Codium extensions.
     # Arguments:    None.
@@ -2773,6 +2794,7 @@ main() {
         return 1
     fi
 
+    # Determine the option and configuration file
     for arg in "$@"; do
         if [[ $arg =~ ^-[abcdfghprvx]$ ||
             $arg =~ ^--(all|bookmark|connect|dock|firefox|gnome-extensions|help|set-gsettings|set-portables|set-repos|version)$ ]]; then
@@ -2793,10 +2815,16 @@ main() {
         return 1
     fi
 
-    [[ ! -f "$_CONFIG_FILE" || -z "$_CONFIG_FILE" ]] && __make_configs         # Make a new configuration file with default settings
-    [ -f "$_BASEDIR"/configure.pop ] && _CONFIG_FILE="$_BASEDIR"/configure.pop # Load default configuration file
-    __load_configs                                                             # Load user configuration file
-    __make_dirs                                                                # Create default script directories
+    # Validate the user configuration file or make a new one, if there's none
+    if [ -f "$_CONFIG_FILE" ]; then
+        validate_json "$_CONFIG_FILE"
+    else
+        __make_configs
+        _CONFIG_FILE="$_BASEDIR"/configure.pop # Assign default configuration file
+    fi
+
+    __load_configs # Load user configuration file
+    __make_dirs    # Create default script directories
 
     # Process the arguments
     case "$_OPTION" in
