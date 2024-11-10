@@ -19,32 +19,32 @@ __init_logfile() {
     # Description:  Creates a log file for this script and manages its backups.
     # Arguments:    None.
     # Output:       File(s) 'poppi[_ddmmYYYY|YYYYmmdd]_HHmmss.log' in the script directory.
-    local bool_created_logfile fmt log_files oldlog total_logs
+    local isLogfile fmt log_files oldlog total_logs
 
     # Continue, only if the global variable is set to 'true', or equals one (1)
-    [[ "$_LOGFILEON" = 0 ]] && return 1
+    [[ "$_LOGFILEON" = 0 ]] && return 2
 
     # Create a log file
     if ! [[ -f "$_LOGFILE"'.log' ]]; then
         if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            bool_created_logfile="true"
+            isLogfile="true"
         else
-            log_and_exit "Failed to create a logfile!" 2
+            log_and_exit "Failed to create a logfile!" 6
         fi
     fi
 
     # Check if the log file is writable and exit on failure
     if [[ -w "$_LOGFILE"'.log' ]]; then
         if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            _FILELOGGER_ACTIVE="true"
-            [[ $bool_created_logfile == "true" ]] && log_message "Created log file: $_LOGFILE.log" 1
+            _FILELOGGER_ACTIVE='true'
+            [[ $isLogfile == 'true' ]] && log_message "Created log file: $_LOGFILE.log" 1
             log_message "Logging initialised" 1
         else
             _FILELOGGER_ACTIVE="false"
-            log_and_exit "Failed to write to log file $_LOGFILE.log" 3
+            log_and_exit "Failed to write to log file $_LOGFILE.log" 7
         fi
     else
-        log_and_exit "Log file $_LOGFILE.log is not writable!" 4
+        log_and_exit "Log file $_LOGFILE.log is not writable!" 7
     fi
 
     # Back up the logs, as specified by user
@@ -226,7 +226,7 @@ __load_configs() {
         fi
     done
 
-    # Extract and assign values to global variables
+    # Extract and assign values to global colour variables
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CHEAD" '.GENERAL."gen.colour_head" // $default') && _CHEAD=$(set_colour "$usrVal" "$_CHEAD")
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CINFO" '.GENERAL."gen.colour_info" // $default') && _CINFO=$(set_colour "$usrVal" "$_CINFO")
     usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_COKAY" '.GENERAL."gen.colour_okay" // $default') && _COKAY=$(set_colour "$usrVal" "$_COKAY")
@@ -279,7 +279,7 @@ __logger_core() {
     # Description:  Main function for logging all processes executing in the shell both in the log file and on the terminal.
     # Arguments:    Two (2) - the level of log and the message to log.
     if [[ $# -ne 2 ]]; then
-        return 37
+        return 3
     else
         declare -r lvl="${1}"
         declare -r lvl_msg="${2}"
@@ -342,7 +342,7 @@ __logger_core() {
         printf "\r%s%s%s %s %s\r" "${lvl_color}" "${lvl_prefix}" "${lvl_sym}" "${lvl_msg}" "${lvl_nc}" # progress reports on the same line ('\r')
     fi
 
-    if [[ $_FILELOGGER_ACTIVE == "true" ]]; then
+    if [[ $_FILELOGGER_ACTIVE == 'true' ]]; then
         printf "%s %-25s %-10s %s\n" "${lvl_ts}" "${FUNCNAME[2]}" "[${lvl_str}]" "$lvl_msg" >>"$_LOGFILE"'.log'
     fi
 }
@@ -354,19 +354,18 @@ __make_configs() {
 
     # Change to base directory or return error code if it fails
     cd "$_BASEDIR" || {
-        log_message "Failed to access '$_BASEDIR'. Exiting ..." 3
-        return 33
+        log_and_exit "Failed to access '$_BASEDIR'. Exiting ..." 4
     }
 
     # Make a new configuration file
     if ! cat <<EOF >"$_BASEDIR"/configure.pop 2>&1 | log_trace "[MKC]"; then
-{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":"3","gen.logfile_format":"US","gen.logfile_on":"1","gen.maximise_window":"1","gen.set_timer":"1","gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":"0","ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.profile":"","ffx.set_homepage":"0","ffx.set_privacy":"1"},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdftocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"keepassxc":{"required":0},"krita":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"stylish":{"required":0},"codium":{"required":0,"extensions":[],"settings":{"nameShort":"Visual Studio Code","nameLong":"Visual Studio Code","extensionsGallery":{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}}},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":0,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":[],"msc.ms_fonts":"0","msc.set_geary":"0","msc.volume_overamplify":"1","msc.wallpaper_on":"0","msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":"0"}}
+{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":"3","gen.logfile_format":"US","gen.logfile_on":"1","gen.maximise_window":"1","gen.set_timer":"1","gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":"0","ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.profile":"","ffx.set_homepage":"0","ffx.set_privacy":"1"},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdftocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"curl":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"jq":{"required":0},"keepassxc":{"required":0},"krita":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"stylish":{"required":0},"codium":{"required":0,"extensions":[],"settings":{"nameShort":"Visual Studio Code","nameLong":"Visual Studio Code","extensionsGallery":{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}}},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":0,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":[],"msc.ms_fonts":"0","msc.set_geary":"0","msc.volume_overamplify":"0","msc.wallpaper_on":"0","msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":"0"}}
 EOF
         log_message "Creating user configuration file failed. Skipping ..." 3
     fi
 
     # Return to the previous directory
-    cd - >/dev/null || log_message "Could not return to previous directory." 3
+    cd - >/dev/null || log_message "Could not return to previous directory." 4
 }
 
 __make_dirs() {
@@ -378,7 +377,7 @@ __make_dirs() {
     for dir in "${Dirs[@]}"; do
         if [ ! -d "$_BASEDIR/data/$dir" ]; then
             if ! mkdir -p "$_BASEDIR/data/$dir"; then
-                log_and_exit "Failed to create directory '$_BASEDIR/data/$dir'. Exiting ..." 73
+                log_and_exit "Failed to create directory '$_BASEDIR/data/$dir'. Exiting ..." 5
             else
                 log_message "Created directory '$_BASEDIR/data/$dir'" 1
             fi
@@ -410,7 +409,7 @@ check_internet() {
             log_message "Connected to the Internet" 1
         else
             log_and_exit "You are not connected to the Internet,
-    please check your network connection and try again." 5
+    please check your network connection and try again." 8
         fi
     fi
 }
@@ -418,7 +417,7 @@ check_internet() {
 check_user() {
     if [[ $EUID -eq 0 ]] || [[ $EUID -ne $_USERID ]]; then
         log_and_exit "This script must be run by '$_USERNAME'.
-    Otherwise it can result in irreversible system-wide changes" 6
+    Otherwise it can result in irreversible system-wide changes" 9
     else
         log_message "Script run by '$_USERNAME'" 1
     fi
@@ -462,6 +461,7 @@ This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
 Written by Victor Quebec for the benefit of the Pop!_OS community.${_CNONE}
+
 EOF
 }
 
@@ -475,12 +475,12 @@ fetch_file() {
 
     # Check the number of arguments
     if [ $# -eq 0 ] || [ $# -gt 3 ]; then
-        log_and_exit "ERR: Wrong number of arguments for ${FUNCNAME[0]}: $#" 7
+        log_and_exit "ERR: Wrong number of arguments for ${FUNCNAME[0]}: $#" 3
     fi
 
     # Check if ${1} is a valid URL
     if ! curl -sfIL "${1}" >/dev/null; then
-        log_and_exit "ERR: ${FUNCNAME[0]} argument \${1} not a valid URL: ${1}" 15
+        log_and_exit "ERR: ${FUNCNAME[0]} argument \${1} not a valid URL: ${1}" 10
     fi
 
     # Assign arguments to variables
@@ -506,7 +506,7 @@ fetch_file() {
         if [ "$filesize" != "$content_length" ]; then
             log_message "Updating download for '$filename'..." 4 "$_STRLEN"
         else
-            return 44
+            return 11
         fi
     fi
 
@@ -522,9 +522,9 @@ fetch_file() {
                     log_message "Downloading '$filename' ... $(bytes_to_human "$filesize") ($percentage%)" 4 "$_STRLEN"
                 else
                     log_message "Downloading '$filename' ... $(bytes_to_human "$filesize")" 4 "$_STRLEN"
-                    if [ "$prevsize" == "$filesize" ]; then
+                    if [ "$prevsize" -eq "$filesize" ]; then
                         ((k++))
-                        if [ "$k" == 3 ]; then break; fi
+                        if [ "$k" -eq 3 ]; then break; fi
                     fi
                     prevsize="$filesize"
                 fi
@@ -541,7 +541,7 @@ ffx_extensions() {
     # Arguments:    None.
     if [ "${#_FFXEXTS[@]}" -eq 0 ]; then
         log_message "No Firefox extensions to install. Skipping ..." 3
-        return 81
+        return 1
     fi
 
     ext_total="${#_FFXEXTS[@]}" # Total number of extensions to install
@@ -660,7 +660,7 @@ EOF
             mv ./permissions.sqlite "$_FFXDIR/$_FFXPRF" # move the newly created file to Firefox profile.
         else
             log_message "Failed to set cookies: directory '$_FFXDIR/$_FFXPRF' unavailable" 3
-            return 7
+            return 12
         fi
     else
         log_message "Failed to set cookies: file 'permissions.sqlite' unavailable" 3
@@ -691,7 +691,7 @@ ffx_profile() {
         log_message "Firefox profile created: $_FFXPRF" 1
     else
         log_message "Failed to create a profile. Skipping ..." 3
-        return 8
+        return 5
     fi
 
     # Run Firefox in the background to populate the profile directory with necessary files.
@@ -703,11 +703,13 @@ ffx_profile() {
 ffx_xID() {
     # Description:  Determines Firefox extension ID.
     # Arguments:    One (1) - extension file (*.xpi).
+    # alternative option to retrieve ID:
+    # xid=$(unzip -p "$xpi" META-INF/mozilla.rsa | openssl pkcs7 -print -inform der | grep "subject.*CN\=" | head -1) && xid=${xid##*\=}
     local xid xpi
 
     if [ $# -ne 1 ]; then
         log_message "ERR: Wrong number of arguments for ${FUNCTION[0]}: $#" 3
-        return 49
+        return 3
     fi
 
     xpi="${1}"
@@ -722,17 +724,7 @@ ffx_xID() {
         fi
     done
 
-    #log_message "Still trying, please wait ..."
-    if unzip -l "$xpi" | grep -q "cose.sig"; then
-        xid=$(unzip -p "$xpi" META-INF/cose.sig | strings | grep '0Y0')
-        if [ "$xid" != 'null' ]; then
-            xid=$(trimex "$xid")
-            echo "$xid"
-            return 0
-        fi
-    fi
-
-    #log_message "Final attempt, please wait ..."
+    # Still trying ...
     if unzip -l "$xpi" | grep -q "mozilla.rsa"; then
         xid=$(unzip -p "$xpi" META-INF/mozilla.rsa | openssl asn1parse -inform DER | grep -A 1 commonName | grep -o '{.*}')
         if [ "$xid" != 'null' ]; then
@@ -742,7 +734,17 @@ ffx_xID() {
         fi
     fi
 
-    return 50
+    # Final attempt
+    if unzip -l "$xpi" | grep -q "cose.sig"; then
+        xid=$(unzip -p "$xpi" META-INF/cose.sig | strings | grep '0Y0')
+        if [ "$xid" != 'null' ]; then
+            xid=$(trimex "$xid")
+            echo "$xid"
+            return 0
+        fi
+    fi
+
+    return 13
 }
 
 finale() {
@@ -793,7 +795,7 @@ isExternalDir() {
     #               It's also imperative that bookmarking of directories takes place after (!) mounting external drives.
     local dir drive fstab
 
-    [ $# != 1 ] && return 62
+    [ $# != 1 ] && return 3
     dir="${1}"
     fstab=$(</etc/fstab)
 
@@ -804,7 +806,7 @@ isExternalDir() {
         fi
     done
 
-    return 63
+    return 13
 }
 
 isInstalled() {
@@ -821,7 +823,7 @@ isInstalled() {
         fi
     done
 
-    return 1
+    return 13
 }
 
 killffx() {
@@ -844,12 +846,12 @@ libreoffice_extensions() {
     local counter dir extension ext_total gh_desc gh_repo loextension logstr oxtURL sfrurl tmpdir
 
     if [ "${#_LOEXTS[@]}" -eq 0 ]; then
-        return 250
+        return 1
     fi
 
     if ! mkdir -p "$_LODIR"; then
         log_message "Failed to create directory '$_LODIR'. Skipping ..." 3
-        return 251
+        return 5
     fi
 
     log_message "[+] Setting up LibreOffice extensions ..." 5
@@ -1004,7 +1006,7 @@ log_trace() {
 
     prompt_active=false
     while true; do
-        if [[ "$prompt_active" == "false" ]]; then
+        if [[ "$prompt_active" == 'false' ]]; then
             IFS= read -r -t1 line
             errcode=$?
         else
@@ -1022,7 +1024,7 @@ log_trace() {
                 perc=$(grep -Eo '[0-9]*\.?[0-9]+%' <<<"$line" | cut -d\. -f1)
                 __logger_core "progress" "$(printf "%s %s" "${1:-NUL}" "Processing, please wait ... $perc%")"
             elif [[ "$line" =~ [WE]: ]]; then
-                log_and_exit "Try re-running the script in a few minutes" 8
+                log_and_exit "Try re-running the script in a few minutes" 14
             else
                 __logger_core "trace" "$(printf "%s %s" "${1:-NUL}" "$line")"
             fi
@@ -1043,18 +1045,18 @@ misc_automount_drives() {
     # Arguments:    None.
     local drive drv label loc uuid
 
-    [[ ${#_AUTODRIVES[@]} -eq 0 ]] && return 38
+    [[ ${#_AUTODRIVES[@]} -eq 0 ]] && return 1
 
     # Check if /etc/fstab is writable
     if ! sudo test -w /etc/fstab 2>&1 | log_trace "[MSC]"; then
         log_message "File '/etc/fstab' is not writable. Skipping ..." 3
-        return 39
+        return 7
     fi
 
     # Back up /etc/fstab
     if ! sudo cp /etc/fstab /etc/fstab.bak 2>&1 | log_trace "[MSC]"; then
         log_message "Failed to back up '/etc/fstab'. Skipping ..." 3
-        return 40
+        return 6
     fi
 
     log_message "[+] Auto-mounting external drives ..." 5
@@ -1085,7 +1087,7 @@ misc_autostart() {
     # Arguments:    None.
     local package
 
-    [[ ${#_AUTOSTART[@]} -eq 0 ]] && return 234
+    [[ ${#_AUTOSTART[@]} -eq 0 ]] && return 1
     log_message "[+] Enabling autostart for select packages ..."
 
     if mkdir -p "$HOME/.config/autostart" 2>&1 | log_trace "[AST]"; then
@@ -1108,7 +1110,7 @@ misc_bookmark_dirs() {
     # Note:         Must be executed after `misc_automount_drives()`!
     local bdir
 
-    [[ ${#_BOOKDIRS[@]} -eq 0 ]] && return 237
+    [[ ${#_BOOKDIRS[@]} -eq 0 ]] && return 1
     log_message "[+] Bookmarking select directories ..." 5
 
     if [ -f "$_GTKBKMRK" ]; then
@@ -1129,7 +1131,7 @@ misc_bookmark_dirs() {
 misc_change_avatar() {
     # Description:  Changes user's avatar on login screen.
     # Arguments:    None.
-    [ "$_AVATARON" != 1 ] && return 238
+    [ "$_AVATARON" != 1 ] && return 2
     local imgsrc
 
     # Set locations for relevant user files
@@ -1188,7 +1190,7 @@ misc_gnome_calc_custom_functions() {
         for func in "${_GCALC[@]}"; do
             if ! printf '%s\n' "$func" >>"$func_dir"/"$func_file" 2>&1 | log_trace "[MSC]"; then
                 log_message "Error appending to $func_dir/$func_file"
-                return 2
+                return 7
             fi
         done
 
@@ -1207,7 +1209,7 @@ misc_set_crontab() {
 
     # Create a temporary directory to store cronjobs
     crondir="$(mktemp -d)"
-    cd "$crondir" || return 33
+    cd "$crondir" || return 4
 
     # Append jobs to temporary file
     for line in "${_CRONLINE[@]}"; do
@@ -1223,12 +1225,12 @@ misc_set_crontab() {
 misc_set_geary() {
     # Description:  Sets options for GNOME Geary.
     # Arguments:    None.
-    [[ "$_SETGEARY" != 1 ]] && return 241
+    [[ "$_SETGEARY" != 1 ]] && return 2
     log_message "[+] Setting up GNOME Geary email client ..." 5
 
     if ! which geary 2>&1 | log_trace "[MSC]"; then
         log_message "Failed to locate Geary on this computer. Skipping ..." 3
-        return 3
+        return 15
     fi
 
     geary 2>&1 | log_trace "[MSC]"
@@ -1237,7 +1239,7 @@ misc_set_geary() {
 misc_set_msfonts() {
     # Description:  Downloads Microsoft fonts from the external server.
     # Arguments:    None.
-    [[ "$_MSFONTS" != 1 ]] && return 242
+    [[ "$_MSFONTS" != 1 ]] && return 2
     local dl_url fileid fontdir pkglist tmpdir tmpurl
 
     log_message "[+] Setting up Microsoft fonts ..." 5
@@ -1249,7 +1251,7 @@ misc_set_msfonts() {
         pkglist='https://dx37.gitlab.io/dx37essentials/pkglist-x86_64.html'
         dl_url='https://dx37.gitlab.io/dx37essentials/x86_64'
         fileid='ttf-ms-win10-10.0.*.zst'
-        cd "$tmpdir" || return 33
+        cd "$tmpdir" || return 4
 
         # Set downloadable url
         fileid=$(curl -sL $pkglist | grep -oP "$fileid")
@@ -1286,7 +1288,7 @@ misc_set_templates() {
 misc_set_volume() {
     # Description:  Over-amplifies the default setting for system volume.
     # Arguments:    None.
-    [[ "$_OVERAMPLIFY" != 1 ]] && return 123
+    [[ "$_OVERAMPLIFY" != 1 ]] && return 2
 
     log_message "[+] Setting volume over-amplification on ..." 5
     if gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true; then
@@ -1300,7 +1302,7 @@ misc_set_volume() {
 misc_set_wallpaper() {
     # Description:  Enables the use of custom wallpapers.
     # Arguments:    None.
-    [ "$_WPON" != 1 ] && return 81
+    [ "$_WPON" != 1 ] && return 2
     local count f resolution total_wprs urls wallpaper wpfile
 
     count=0
@@ -1311,7 +1313,7 @@ misc_set_wallpaper() {
         log_message "Directory '$_WPSRCDIR' available" 1
     else
         log_message "Failed to create directory '$_WPSRCDIR'. Skipping ..." 3
-        return 202
+        return 5
     fi
 
     # Copy wallpapers from external location to the local directory
@@ -1356,7 +1358,7 @@ misc_set_weekday() {
     #
     # Note:         An alternative option might be `sudo sed -i -e 's:first_weekday\ 3:first_weekday\ 2:g' /usr/share/i18n/locales/en_US`,
     #               but less preferred, as it assumes reverse engineering the en_US locale.
-    [[ "$_SETMONDAY" != 1 ]] && return 236
+    [[ "$_SETMONDAY" != 1 ]] && return 2
 
     if [ "$LC_TIME" != 'en_GB.UTF-8' ] || ! grep -iq "export LC_TIME=.*en_gb\.utf\-8" "$_USERPROFILE"; then
         log_message "[+] Setting the first day of the week to Monday ..." 5
@@ -1467,25 +1469,25 @@ screenlock() {
 }
 
 set_colour() {
-    # Description:  Converts colour values provided in RGB and Hex to Bash's ANSI format
+    # Description:  Converts RGB and Hex colours to ANSI format used in Bash
     # Arguments:    Two (2)
     #   -- User colour
     #   -- Fallback colour
-    local char char1 char2 clr defClr hex i pos pos1 pos2 tmpClr usrClr
+    [[ $# -eq 0 ]] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument" 2 && return 3
 
-    [[ $# -eq 0 ]] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument" 2 && return 4
-    local usrClr="${1}"
-    local defClr="${2}"
-    local hex='0123456789abcdef'
-    local char=';'
-    local clr=''
+    local char char1 char2 clr defClr hex i pos pos1 pos2 sc tmpClr usrClr
+    usrClr="${1}"
+    defClr="${2}"
+    hex='0123456789abcdef'
+    sc=';'
+    clr=''
 
-    usrClr=${usrClr,,}                    # convert input to lowercase
-    if [[ "$usrClr" == *"$char"* ]]; then # check for default value
+    usrClr=${usrClr,,}                  # convert input to lowercase
+    if [[ "$usrClr" == *"$sc"* ]]; then # check for default value
         echo -e "$usrClr"
         return 0
     elif [[ "$usrClr" =~ ^[r][g][b]\(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\,([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\,([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\)$ ]]; then # regex pattern to check the RGB value
-        usrClr="${usrClr#*\(}" && usrClr="${usrClr%\)*}" && usrClr="${usrClr//,/;}"                                                                                                                         # convert user value to 'semi-ANSI' format
+        usrClr="${usrClr#*\(}" && usrClr="${usrClr%\)*}" && usrClr="${usrClr//,/$sc}"                                                                                                                       # convert user value to 'semi-ANSI' format
         clr="$usrClr"
     elif [[ "$usrClr" =~ ^\#([a-f0-9]{6}|[a-f0-9]{3})$ ]]; then # regex pattern to check the 3- or 6-char hex value
         if [[ "${#usrClr}" -eq 4 ]]; then                       # hex shorthand, i.e., #1a3
@@ -1493,7 +1495,7 @@ set_colour() {
                 char="${usrClr:$i:1}"                  # determine the char
                 pos="${hex%"$char"*}" && pos="${#pos}" # determine char position/index in $hex
                 tmpClr=$((pos * 16 + pos))             # convert to RGB value
-                clr=${clr}';'$tmpClr                   # concatenate the string
+                clr=${clr}${sc}${tmpClr}               # concatenate the string
             done
         else
             for ((i = 1; i <= 6; i += 2)); do # hex full, i.e., #12ab34
@@ -1502,7 +1504,7 @@ set_colour() {
                 pos1="${hex%"$char1"*}" && pos1="${#pos1}"
                 pos2="${hex%"$char2"*}" && pos2="${#pos2}"
                 tmpClr=$((pos1 * 16 + pos2))
-                clr=${clr}';'$tmpClr
+                clr=${clr}${sc}${tmpClr}
             done
         fi
         clr=${clr#*;} # remove the leading semi-colon
@@ -1546,7 +1548,7 @@ set_configs() {
 set_dependency() {
     # Description:  Installs packages required to run POPPI properly.
     # Arguments:    One (1) - dependency package to install.
-    [[ $# -eq 0 ]] && log_and_exit "ERR: ${FUNCNAME[0]} requires at least 1 argument" 221
+    [[ $# -eq 0 ]] && log_and_exit "ERR: ${FUNCNAME[0]} requires at least 1 argument" 3
     local dep
 
     dep="$1"
@@ -1559,7 +1561,7 @@ set_dependency() {
             if sudo apt-get install -y "${dep}" 2>&1 | log_trace "[DEP]"; then
                 [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "Dependency package '$dep' installed" 1
             else
-                log_and_exit "Failed to install dependency package '$dep'" 9
+                log_and_exit "Failed to install dependency package '$dep'" 16
             fi
         else
             log_message "Dependency package '$dep' found"
@@ -1574,7 +1576,7 @@ set_favourites() {
 
     if [ "${#_GFAVOURITES}" -eq 0 ]; then
         log_message "No favourite programs to dock. Skipping ..." 3
-        return 5
+        return 1
     fi
 
     # Try to find the associated launcher file for the favourite program
@@ -1613,7 +1615,7 @@ set_favourites() {
 set_firefox() {
     # Description:  Sets Firefox parameters (extensions, privacy, settings, etc.) based on user input.
     # Arguments:    None.
-    [[ "$_FFXCONFIG" != 1 ]] && return 6
+    [[ "$_FFXCONFIG" != 1 ]] && return 2
     log_message "Setting up Firefox ..." 5
     local channel counter ext_title ext_total ffv logstr url xid ext_URL
     local arkenfox_files dbfile extension file UUID _XID tmpdir xpi
@@ -1627,7 +1629,7 @@ set_firefox() {
             if [[ $ffv -le 89 ]]; then
                 log_message "Your version of Firefox is not compatible with this script.
     Please upgrade and re-run the script as './${_SCRIPT} -f' to apply Firefox settings." 3
-                return 9
+                return 17
             fi
 
             if [[ -f "$_FFXCHANNEL" ]]; then
@@ -1642,14 +1644,14 @@ set_firefox() {
         fi
     else
         log_message "Mozilla Firefox not found" 3
-        return 10
+        return 15
     fi
 
     # Firefox running?
     if pgrep "firefox" >/dev/null 2>&1; then
         log_message "Cannot proceed while Firefox is running.
     Please quit Firefox and re-run this script as './${_SCRIPT} -f' to apply Firefox settings." 3
-        return 11
+        return 18
     fi
 
     ffx_profile                                                       # Determine Firefox profile
@@ -1690,7 +1692,7 @@ set_firefox() {
             fi
         fi
     else
-        log_message "No extensions to install. Skipping ..." 3
+        log_message "Firefox profile directory missing. Skipping ..." 3
         return 12
     fi
 
@@ -1705,7 +1707,7 @@ set_firefox() {
             done
 
             # Set permissions to user preference files
-            cd "$_FFXDIR/$_FFXPRF" || return 33
+            cd "$_FFXDIR/$_FFXPRF" || return 4
             if [ -f "./updater.sh" ]; then
                 chmod +x "./updater.sh"
                 bash "./updater.sh" 2>&1 | log_trace "[FFX]"
@@ -1738,7 +1740,7 @@ set_gnome_extensions() {
         # Reason: GNOME Extensions provides individual downloads based on GNOME versions
         gnome_version=$(sudo gnome-shell --version 2>&1 | grep -oP '\d+\.\d+' | awk -F. '{print $1}')
         tmp_dir=$(mktemp -d)
-        cd "$tmp_dir" || return 33
+        cd "$tmp_dir" || return 4
 
         # Download the user-defined extensions
         for extension in "${_GNOMEXTS[@]}"; do
@@ -1770,12 +1772,12 @@ set_gnome_extensions() {
                 log_message "GNOME extension '$extension' installed" 1 "$_STRLEN"
             else
                 log_message "Failed to install GNOME extension '$extension'" 3 "$_STRLEN"
-                return 13
+                return 16
             fi
         done
     else
         log_message "Failed to locate GNOME Extensions Manager. Skipping ..." 3
-        return 14
+        return 15
     fi
 
     # Enable GNOME extensions
@@ -1825,21 +1827,21 @@ set_gsettings() {
     # Arguments:    None.
     # Discussion: https://www.reddit.com/r/gnome/comments/vz37z2
     # Custom keybindings: https://www.suse.com/support/kb/doc/?id=000019319
+    [ ${#_GSETTINGS[@]} -eq 0 ] && return 1
     local key schema setting value
 
-    if [ ${#_GSETTINGS[@]} -gt 0 ]; then
-        log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
-        for setting in "${_GSETTINGS[@]}"; do
-            IFS=' ' read -r schema key value <<<"$setting" # populate keys with values from the array
-            if [ "$key" == 'scrollback-unlimited' ]; then
-                #        eval "e_setting=\"$setting\""
-                echo "$setting" "$schema"
-            fi
-            gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "[GST]" # set the key/value pairs
-        done
+    log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
+    for setting in "${_GSETTINGS[@]}"; do
+        # Expand the variables in JSON data, if any
+        if [[ $setting == *'$'* ]]; then
+            setting=$(eval echo "\"$setting\"")
+        fi
 
-        log_message "GNOME settings set" 1
-    fi
+        IFS=' ' read -r schema key value <<<"$setting"                   # populate keys with values from the array
+        gsettings set "$schema" "$key" "$value" 2>&1 | log_trace "[GST]" # set the key/value pairs
+    done
+
+    log_message "GNOME settings set" 1
 }
 
 set_permission() {
@@ -1849,13 +1851,13 @@ set_permission() {
 
     arg="$1"
     if [ $# -ne 1 ]; then
-        log_and_exit "Wrong number of arguments for ${FUNCNAME[2]}" 10
+        log_and_exit "Wrong number of arguments for ${FUNCNAME[2]}" 3
     fi
 
     if chown -R "$_USERID":"$_USERNAME" "$arg" && chmod -R 774 "$arg"; then
         log_message "User '$_USERNAME' set RWX permissions for $arg" 1
     else
-        log_and_exit "Failed to set permissions for $arg" 11
+        log_and_exit "Failed to set permissions for $arg" 19
     fi
 }
 
@@ -1869,7 +1871,7 @@ set_portables() {
     # Check if the global array variable is not empty
     if [ "${#_PORTABLES[@]}" -eq 0 ]; then
         log_message "Nothing to install. Skipping ..." 3
-        return 15
+        return 1
     fi
 
     # Array of portable packages (title;filename;URL;command)
@@ -1878,10 +1880,12 @@ set_portables() {
         "Audacity;audacity;https://api.github.com/repos/audacity/audacity/releases/latest;$jqcmd"
         'Bleachbit;bleachbit;https://api.github.com/repos/bleachbit/bleachbit/releases/latest;grep 'tarball_url' | cut -d\" -f4'
         "CPU-X;cpux;https://api.github.com/repos/X0rg/CPU-X/releases/latest;$jqcmd"
+        "cURL;curl;https://api.github.com/repos/moparisthebest/static-curl/releases/latest;jq -r '.assets[].browser_download_url' | grep 'curl-amd64'"
         'DeadBeef;deadbeef;https://sourceforge.net/projects/deadbeef/files/travis/linux/master/;grep -oP "https.*deadbeef-static.*bz2/download" | head -1'
         "HW-Probe;hwprobe;https://api.github.com/repos/linuxhw/hw-probe/releases/latest;$jqcmd"
         "ImageMagick;imagemagick;https://api.github.com/repos/ImageMagick/ImageMagick/releases/latest;$jqcmd"
         'Inkscape;inkscape;https://inkscape.org/release/all/gnulinux/appimage;grep -iP "\>inkscape.*\.appimage" | cut -d\" -f2 | tail -1 | sed "s/^/https:\/\/inkscape\.org/"'
+        "jq;jq;https://api.github.com/repos/jqlang/jq/releases/latest;jq -r '.assets[].browser_download_url' | grep 'jq-linux-amd64'"
         "KeePassXC;keepassxc;https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest;$jqcmd"
         'Krita;krita;https://krita.org/en/download/;grep -ioP "\<a href\=https://download.kde.org/stable/krita/\d\.\d\.\d\/krita-.*-x86_64.appimage" | cut -d\= -f2 | tail -1'
         'MuseScore;musescore;https://musescore.org/en/download/musescore-x86_64.AppImage;grep -ioP "https.*appimage" | tail -1'
@@ -1899,7 +1903,7 @@ set_portables() {
     # Create a directory for portable programs
     if ! mkdir -p "$_APPSDIR"; then
         log_message "Failed to create directory '$_APPSDIR'. Skipping ..." 3
-        return 16
+        return 5
     fi
 
     # Bookmark the portables directory
@@ -1915,7 +1919,7 @@ set_portables() {
     fi
 
     check_internet
-    cd "$_APPSDIR" || return 33
+    cd "$_APPSDIR" || return 4
 
     for portable in "${portables[@]}"; do
         IFS=';' read -r name filename tmp_url cmd <<<"$portable"
@@ -1938,7 +1942,7 @@ set_portables() {
                 # Download the package and extract, if necessary
                 if [ -n "$full_url" ]; then
                     fetch_file "$full_url" "$filename" "$_APPSDIR"
-                    [ $? != 44 ] && tar_extractor "$_APPSDIR/$filename" "$filename" "$_APPSDIR" 2>/dev/null # skip extraction, if file exists
+                    [ $? != 11 ] && tar_extractor "$_APPSDIR/$filename" "$filename" "$_APPSDIR" 2>/dev/null # skip extraction, if file exists
                 else
                     log_message "Cannot download '$name'. Skipping ..." 3
                     continue
@@ -1991,13 +1995,13 @@ set_portables() {
     # Download and install VS Codium extensions
     vsc_extensions
 
-    # set user and group permissions
+    # Set user and group permissions
     dirs="$_APPSDIR $_USERAPPS $_USERICONS/hicolor/scalable/apps"
     for dir in $dirs; do
         [ -d "$dir" ] && set_permission "$dir"
     done
 
-    # append the Portables directory to ~/.profile
+    # Append the Portables directory to ~/.profile
     if touch "$_USERPROFILE"; then
         if ! grep -q "Portables" <"$_USERPROFILE"; then
             printf "\n%s\n" "export PATH=\$PATH:$_APPSDIR" >>"$_USERPROFILE"
@@ -2022,7 +2026,7 @@ set_repos() {
     # Check if the global array variable is not empty
     if [ "${#_INSTALLERS[@]}" -eq 0 ]; then
         log_message "Nothing to install. Skipping ..." 3
-        return 157
+        return 1
     fi
 
     stop_packagekitd
@@ -2057,7 +2061,7 @@ set_repos() {
         ffmpeg_s)
             # shellcheck disable=2034,2154
             if ! which "$package" >/dev/null 2>&1; then
-                cd "$temp_dir" || return 33
+                cd "$temp_dir" || return 4
 
                 # Install dependencies
                 url='https://bootstrap.pypa.io/get-pip.py'
@@ -2122,7 +2126,7 @@ set_repos() {
                     if [ ! -f "$filename" ]; then
                         if ! fetch_file "$url" "$filename" "."; then
                             log_message "Failed to download required library. Please check if URLs are valid" 3
-                            return 17
+                            return 20
                         fi
                     fi
 
@@ -2134,11 +2138,11 @@ set_repos() {
 
                 # Set library GSM
                 if true; then
-                    cd "$gsm_DIR" || return 33
+                    cd "$gsm_DIR" || return 4
                     make CCINC="${CFLAGS}" LDINC="${LDFLAGS}" lib/libgsm.a | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "GSM make failed. Skipping ..." 3
-                        return 18
+                        return 16
                     fi
 
                     mkdir -p "$temp_dir/build/local/include/gsm"
@@ -2149,23 +2153,23 @@ set_repos() {
 
                 # Set library Speex
                 if true; then
-                    cd "$speex_DIR" || return 33
+                    cd "$speex_DIR" || return 4
                     ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Speex configure failed. Skipping ..." 3
-                        return 19
+                        return 16
                     fi
 
                     make -C libspeex | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Speex make failed. Skipping ..." 3
-                        return 20
+                        return 16
                     fi
 
                     make -C include | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Speex make failed. Skipping ..." 3
-                        return 21
+                        return 16
                     fi
 
                     cp -pR include/* "$temp_dir/build/local/include" 2>&1 | log_trace "[PPA]"
@@ -2176,23 +2180,23 @@ set_repos() {
 
                 # Set library Lame
                 if true; then
-                    cd "$lame_DIR" || return 33
+                    cd "$lame_DIR" || return 4
                     ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-frontend | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Lame configure failed. Skipping ..." 3
-                        return 22
+                        return 16
                     fi
 
                     make -C mpglib | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Lame mpglib make failed. Skipping ..." 3
-                        return 23
+                        return 16
                     fi
 
                     make -C libmp3lame | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Lame libmp3lame make failed. Skipping ..." 3
-                        return 24
+                        return 16
                     fi
 
                     mkdir -p "$temp_dir/build/local/include/lame"
@@ -2203,17 +2207,17 @@ set_repos() {
 
                 # Set library Opus
                 if true; then
-                    cd "$opus_DIR" || return 33
+                    cd "$opus_DIR" || return 4
                     ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-doc --disable-extra-programs | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Opus configure failed. Skipping ..." 3
-                        return 25
+                        return 16
                     fi
 
                     make | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Opus make failed. Skipping ..." 3
-                        return 26
+                        return 16
                     fi
 
                     cp -pR opus.pc "$temp_dir/build/local/lib/pkgconfig"
@@ -2224,23 +2228,23 @@ set_repos() {
 
                 # Set library Opencore-AMR
                 if true; then
-                    cd "$amr_DIR" || return 33
+                    cd "$amr_DIR" || return 4
                     ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Opencore-AMR configure failed. Skipping ..." 3
-                        return 27
+                        return 16
                     fi
 
                     make -C amrnb | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Opencore-AMRNB make failed. Skipping ..." 3
-                        return 28
+                        return 16
                     fi
 
                     make -C amrwb | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "Opencore-AMRWB make failed. Skipping ..." 3
-                        return 29
+                        return 16
                     fi
 
                     mkdir -p "$temp_dir/build/local/include/opencore-amrnb"
@@ -2296,13 +2300,13 @@ set_repos() {
                         --extra-libs="-lpthread -lm" 2>&1 | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "$title configure failed. Skipping ..." 3
-                        return 30
+                        return 16
                     fi
 
                     make -j"$(nproc)" 2>&1 | log_trace "[PPA]"
                     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
                         log_message "$title make failed. Skipping ..."
-                        return 31
+                        return 16
                     fi
 
                     log_message "[+] Creating a Debian file with checkinstall ..." 5
@@ -2326,7 +2330,7 @@ set_repos() {
                 else
                     log_message "Cannot continue $title installation.
                 Please make sure 'yasm', 'checkinstall' installed, and/or archive intact" 3
-                    return 32
+                    return 15
                 fi
             else
                 log_message "$title already installed. Skipping ..."
@@ -2388,7 +2392,7 @@ set_repos() {
             if ! which "$package" >/dev/null 2>&1; then
                 url='https://download.teamviewer.com/download/linux/teamviewer_amd64.deb'
                 filename=$(basename "$url")
-                cd "$temp_dir" || return 33
+                cd "$temp_dir" || return 4
                 fetch_file "$url" "$filename" "."
                 sudo apt-get install "./$filename" -y 2>&1 | log_trace "[PPA]"
                 if [ "${PIPESTATUS[0]}" -eq 0 ]; then
@@ -2438,10 +2442,10 @@ system_check() {
         _DISTRO_PRETTY_NAME="$(awk '/PRETTY_NAME=/' "${_OS_RELEASE}" | sed 's/PRETTY_NAME=//' | tr -d '"')"
         _NAME="$(awk '/^NAME=/' "${_OS_RELEASE}" | sed 's/^NAME=//' | tr -d '"')"
         _VERSION_CODENAME="$(awk '/VERSION_CODENAME=/' "${_OS_RELEASE}" | sed 's/VERSION_CODENAME=//')"
-        [[ ${_NAME} != "${_OS}" ]] && log_and_exit "Operating system mismatch: ${_NAME}" 13
+        [[ ${_NAME} != "${_OS}" ]] && log_and_exit "Operating system mismatch: ${_NAME}" 17
         log_message "Operating system: ${_DISTRO_PRETTY_NAME}"
     else
-        log_and_exit "Failed to determine operating system!" 14
+        log_and_exit "Failed to determine operating system!" 21
     fi
 
     readonly _DISTRO_PRETTY_NAME _NAME _VERSION_CODENAME
@@ -2520,7 +2524,7 @@ tar_extractor() {
     local appfile appname archive_type ext fmt isArchive loc lst newdir tar xdir zip
 
     # Check the number of supplied arguments
-    [ $# -eq 0 ] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument: $#" 2 && return 34
+    [ $# -eq 0 ] && log_message "ERR: ${FUNCNAME[0]} requires at least 1 argument: $#" 2 && return 3
     [ $# -gt 0 ] && [ $# -lt 3 ] && log_message "WRN: Insufficient arguments for ${FUNCNAME[0]}: $#" 3
 
     # Check if argument ${1} is a valid archive file, then
@@ -2536,7 +2540,7 @@ tar_extractor() {
 
     if [[ $isArchive = 'false' ]]; then
         log_message "ERR: ${FUNCNAME[0]} \${1} not a valid archive: $appfile" 2
-        return 35
+        return 22
     fi
 
     # Check if the 2nd argument is a valid Linux name, then
@@ -2613,7 +2617,7 @@ trimex() {
     # Arguments:    One (1) - title of the extension to be trimmed.
     if [ $# -ne 1 ]; then
         log_message "ERR: Wrong number of arguments for '${FUNCNAME[0]}': $#" 3
-        return 63
+        return 3
     fi
 
     local val
@@ -2657,17 +2661,36 @@ user_consent() {
     done
 }
 
+# shellcheck disable=SC2190
+validate_json() {
+    local json_file json_keys
+
+    if [ $# -ne 1 ]; then
+        log_and_exit "ERR: Wrong number of arguments for '${FUNCTION[0]}'." 3
+    fi
+
+    json_file="$1"
+    declare -a json_keys=(GENERAL GENERAL.\"gen.colour_head\" GENERAL.\"gen.colour_info\" GENERAL.\"gen.colour_okay\" GENERAL.\"gen.colour_stop\" GENERAL.\"gen.colour_warn\" GENERAL.\"gen.logfile_backup_no\" GENERAL.\"gen.logfile_format\" GENERAL.\"gen.logfile_on\" GENERAL.\"gen.maximise_window\" GENERAL.\"gen.set_timer\" GENERAL.\"gen.test_server\" FIREFOX FIREFOX.\"ffx.configure\" FIREFOX.\"ffx.cookies_to_keep\" FIREFOX.\"ffx.extensions\" FIREFOX.\"ffx.profile\" FIREFOX.\"ffx.set_homepage\" FIREFOX.\"ffx.set_privacy\" PACKAGES PACKAGES.\"pkg.autostart\" PACKAGES.\"pkg.installers\" PACKAGES.\"pkg.installers\".Calibre PACKAGES.\"pkg.installers\".Calibre.required PACKAGES.\"pkg.installers\".\"DConf-Editor\" PACKAGES.\"pkg.installers\".\"DConf-Editor\".required PACKAGES.\"pkg.installers\".FFMPEG_s PACKAGES.\"pkg.installers\".FFMPEG_s.required PACKAGES.\"pkg.installers\".FSearch PACKAGES.\"pkg.installers\".FSearch.required PACKAGES.\"pkg.installers\".LibreOffice PACKAGES.\"pkg.installers\".LibreOffice.required PACKAGES.\"pkg.installers\".LibreOffice.extensions PACKAGES.\"pkg.installers\".lmsensors PACKAGES.\"pkg.installers\".lmsensors.required PACKAGES.\"pkg.installers\".pdftocgen PACKAGES.\"pkg.installers\".pdftocgen.required PACKAGES.\"pkg.installers\".TeamViewer PACKAGES.\"pkg.installers\".TeamViewer.required PACKAGES.\"pkg.installers\".\"Virt-Manager\" PACKAGES.\"pkg.installers\".\"Virt-Manager\".required PACKAGES.\"pkg.portables\" PACKAGES.\"pkg.portables\".audacity PACKAGES.\"pkg.portables\".audacity.required PACKAGES.\"pkg.portables\".bleachbit PACKAGES.\"pkg.portables\".bleachbit.required PACKAGES.\"pkg.portables\".cpux PACKAGES.\"pkg.portables\".cpux.required PACKAGES.\"pkg.portables\".curl PACKAGES.\"pkg.portables\".curl.required PACKAGES.\"pkg.portables\".deadbeef PACKAGES.\"pkg.portables\".deadbeef.required PACKAGES.\"pkg.portables\".hwprobe PACKAGES.\"pkg.portables\".hwprobe.required PACKAGES.\"pkg.portables\".imagemagick PACKAGES.\"pkg.portables\".imagemagick.required PACKAGES.\"pkg.portables\".inkscape PACKAGES.\"pkg.portables\".inkscape.required PACKAGES.\"pkg.portables\".jq PACKAGES.\"pkg.portables\".jq.required PACKAGES.\"pkg.portables\".keepassxc PACKAGES.\"pkg.portables\".keepassxc.required PACKAGES.\"pkg.portables\".krita PACKAGES.\"pkg.portables\".krita.required PACKAGES.\"pkg.portables\".musescore PACKAGES.\"pkg.portables\".musescore.required PACKAGES.\"pkg.portables\".neofetch PACKAGES.\"pkg.portables\".neofetch.required PACKAGES.\"pkg.portables\".qbittorrent PACKAGES.\"pkg.portables\".qbittorrent.required PACKAGES.\"pkg.portables\".smplayer PACKAGES.\"pkg.portables\".smplayer.required PACKAGES.\"pkg.portables\".sqlitebrowser PACKAGES.\"pkg.portables\".sqlitebrowser.required PACKAGES.\"pkg.portables\".stylish PACKAGES.\"pkg.portables\".stylish.required PACKAGES.\"pkg.portables\".codium PACKAGES.\"pkg.portables\".codium.required PACKAGES.\"pkg.portables\".codium.extensions PACKAGES.\"pkg.portables\".codium.settings PACKAGES.\"pkg.portables\".codium.settings.nameShort PACKAGES.\"pkg.portables\".codium.settings.nameLong PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.serviceUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.cacheUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.itemUrl PACKAGES.\"pkg.portables\".xnview PACKAGES.\"pkg.portables\".xnview.required PACKAGES.\"pkg.portables\".xournalpp PACKAGES.\"pkg.portables\".xournalpp.required PACKAGES.\"pkg.portables\".ytdlp PACKAGES.\"pkg.portables\".ytdlp.required PACKAGES.\"pkg.portables_dir\" MISCOPS MISCOPS.\"msc.automount_drives\" MISCOPS.\"msc.avatar_enable\" MISCOPS.\"msc.avatar_image\" MISCOPS.\"msc.bookmarked_dirs\" MISCOPS.\"msc.crontab_cmds\" MISCOPS.\"msc.gnome_calc_functions\" MISCOPS.\"msc.gnome_extensions\" MISCOPS.\"msc.gnome_extension_settings\" MISCOPS.\"msc.gnome_favourites\" MISCOPS.\"msc.gnome_settings\" MISCOPS.\"msc.ms_fonts\" MISCOPS.\"msc.set_geary\" MISCOPS.\"msc.volume_overamplify\" MISCOPS.\"msc.wallpaper_on\" MISCOPS.\"msc.wallpaper_src_dir\" MISCOPS.\"msc.wallpaper_ext_dir\" MISCOPS.\"msc.week_starts_on_monday\")
+    for key in "${json_keys[@]}"; do
+        if ! jq -e ".${key} // empty" "$json_file" >/dev/null; then
+            log_and_exit "Not a valid configuration file. Exiting ..." 23
+        fi
+    done
+
+    return 0
+}
+
 vsc_extensions() {
     # Description:  Downloads and sets up VS Codium extensions.
     # Arguments:    None.
     local codium_dir extensions_dir
 
     if [ ! -d "$_APPSDIR"/codium ]; then
-        log_message "VS Codium is not available. Skipping ..." 3 && return 55
+        log_message "VS Codium is not available. Skipping ..." 3 && return 12
     fi
 
     if [ "${#_VSIX[@]}" -eq 0 ]; then
-        log_message "No VS Codium extensions to install. Skipping ..." 3 && return 56
+        log_message "No VS Codium extensions to install. Skipping ..." 3 && return 1
     fi
 
     codium_dir="$_APPSDIR"/codium/bin
@@ -2685,10 +2708,10 @@ vsc_extensions() {
                 "$codium_dir"/codium --install-extension "$extension" --force 2>&1 | log_trace "[VSC]"
             done
         else
-            log_message "Required executable 'codium' is missing. Skipping ..." && return 57
+            log_message "Required executable 'codium' is missing. Skipping ..." && return 24
         fi
     else
-        log_message "Failed to install VS Codium extensions. Skipping ..." 3 && return 58
+        log_message "Failed to install VS Codium extensions. Skipping ..." 3 && return 5
     fi
 }
 
@@ -2704,13 +2727,13 @@ vsc_patcher() {
     # Check if file exists
     if [ ! -f "$product_json" ]; then
         log_message "File '$product_json' not found. Skipping ..." 3
-        return 136
+        return 24
     fi
 
     # Create a backup of the original file before any modification
     if ! cp "$product_json" "$product_bak" 2>&1 | log_trace "[PRT]"; then
         log_message "Failed to back up '$product_json'. Skipping ..." 3
-        return 137
+        return 6
     fi
 
     # Define the new values
@@ -2743,7 +2766,7 @@ vsc_patcher() {
         log_message "File '$product_json' patched" 1
     else
         log_message "Patching '$product_json' failed" 3
-        return 36
+        return 14
     fi
 }
 
@@ -2768,34 +2791,45 @@ main() {
 
     # Check the arguments
     # At least one, but not more than two arguments are required
-    if [[ $# -lt 1 || $# -gt 2 ]]; then
+    if [[ $# -eq 0 || $# -gt 2 ]]; then
         display_usage
-        return 1
+        return 3
     fi
 
+    # Determine the option and configuration file
     for arg in "$@"; do
-        if [[ $arg =~ ^-[abcdfghprvx]$ ]]; then
+        if [[ $arg =~ ^-[abcdfghprvx]$ ||
+            $arg =~ ^--(all|bookmark|connect|dock|firefox|gnome-extensions|help|set-gsettings|set-portables|set-repos|version)$ ]]; then
             _OPTION=$arg
+            continue
         elif [[ -f $arg ]]; then
             _CONFIG_FILE=$arg
-        elif [[ ! -f $arg ]]; then
-            continue # the 1st argument may be a non-existent file
+            continue
         else
             display_usage
-            return 1
+            return 25
         fi
     done
 
     # At least one argument must be an option
-    if [[ ($# -eq 1 || $# -eq 2) && -z $_OPTION ]]; then
+    if [[ -z $_OPTION ]]; then
         display_usage
-        return 1
+        return 3
     fi
 
-    [[ ! -f "$_CONFIG_FILE" || -z "$_CONFIG_FILE" ]] && __make_configs         # Make a new configuration file with default settings
-    [ -f "$_BASEDIR"/configure.pop ] && _CONFIG_FILE="$_BASEDIR"/configure.pop # Load default configuration file
-    __load_configs                                                             # Load user configuration file
-    __make_dirs                                                                # Create default script directories
+    # Validate the user configuration file or make a new one if there's none
+    if ! [ -f "$_CONFIG_FILE" ] && [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
+        __make_configs
+        _CONFIG_FILE="$_BASEDIR"/configure.pop # Assign default configuration file
+    fi
+
+    # Validate and load configs if the option is not one of the specified characters or words
+    if [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
+        validate_json "$_CONFIG_FILE"
+        __load_configs
+    fi
+
+    __make_dirs # Create default script directories
 
     # Process the arguments
     case "$_OPTION" in
@@ -2850,7 +2884,9 @@ main() {
         restart
     fi
 
-    finale
+    if [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
+        finale
+    fi
 }
 
 # The magic starts here ...

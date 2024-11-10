@@ -191,7 +191,11 @@ This section specifies general settings pertinent to the script itself.
 
 #### Section `FIREFOX`
 
-This section covers the operations with the Firefox browser, including but not limited to setting a user profile, download and installation of browser extensions, setting user's privacy environment, etc.
+This section covers all the operations with the Firefox browser, including:
+* the creation of user profile;
+* the download and installation of browser extensions;
+* setting user's privacy environment (Arkenfox stuff reinforced with personal [user overrides](https://github.com/arkenfox/user.js/wiki));
+* setting the persistent cookies.
 
 <table>
 <tr>
@@ -712,6 +716,7 @@ Always run the script as **user**.
 | [Bleachbit][]         | bleachbit     |
 | [Calibre][]           | calibre       |
 | [CPU-X][]             | cpux          |
+| [cURL][]              | curl          |
 | [DConf-Editor][]      | dconf-editor  |
 | [Deadbeef][]          | deadbeef      |
 | [FFMPEG][]            | ffmpeg        |
@@ -720,6 +725,7 @@ Always run the script as **user**.
 | [HW-Probe][]          | hwprobe       |
 | [ImageMagick][]       | imagemagick   |
 | [Inkscape][]          | inkscape      |
+| [jq][]                | jq            |
 | [KeePassXC][]         | keepassxc     |
 | [Krita][]             | krita         |
 | [LibreOffice][]       | libreoffice   |
@@ -751,6 +757,7 @@ Always run the script as **user**.
 [Bleachbit]: https://www.bleachbit.org/download/linux
 [Calibre]: https://calibre-ebook.com
 [CPU-X]: https://thetumultuousunicornofdarkness.github.io/CPU-X/
+[cURL]: https://curl.se
 [DConf-Editor]: https://apps.gnome.org/DconfEditor/
 [Deadbeef]: https://deadbeef.sourceforge.io/
 [FFMPEG]: https://www.ffmpeg.org/
@@ -759,6 +766,7 @@ Always run the script as **user**.
 [HW-Probe]: https://github.com/linuxhw/hw-probe
 [ImageMagick]: https://www.imagemagick.org/
 [Inkscape]: https://inkscape.org/
+[jq]: https://jqlang.github.io/jq/
 [KeePassXC]: https://keepassxc.org/
 [Krita]: https://krita.org/
 [LibreOffice]: https://www.libreoffice.org/download/download-libreoffice/
