@@ -1,9 +1,9 @@
 .cspell/
 .vscode/
-data/configs
-data/configsp
-data/dotfiles
-data/firefox
+data/configs/
+data/configsp/
+data/dotfiles/
+data/firefox/
 *.code-workspace
 *.json
 *.log

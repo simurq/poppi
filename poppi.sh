@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 #############################################################################################################
-# Description:          	Pop!_OS post-installation routines tested on version 22.04 LTS                  #
+# Description:          	Pop!_OS post-installation methods tested on version 22.04 LTS                   #
 # Github repository:    	https://github.com/simurqq/poppi                                                #
 # License:              	GPLv3                                                                           #
 # Author:               	Victor Quebec                                                                   #
 # Date:                 	Nov 5, 2024                                                                     #
 # Requirements:             Bash v4.2 and above,                                                            #
-#                           coreutils, jq                                                                   #
+#                           coreutils, curl, jq, pip, python                                                #
 #############################################################################################################
 
-# shellcheck disable=SC2010
+# shellcheck disable=SC2010 source=/dev/null
 
 set -o pipefail # details: https://t.ly/U7D1K
 _START_TIME=$SECONDS
@@ -19,42 +19,17 @@ __init_logfile() {
     # Description:  Creates a log file for this script and manages its backups.
     # Arguments:    None.
     # Output:       File(s) 'poppi[_ddmmYYYY|YYYYmmdd]_HHmmss.log' in the script directory.
-    local isLogfile fmt log_files oldlog total_logs
+    local fmt log_files oldlog total_logs
 
-    # Continue, only if the global variable is set to 'true', or equals one (1)
-    [[ "$_LOGFILEON" = 0 ]] && return 2
-
-    # Create a log file
-    if ! [[ -f "$_LOGFILE"'.log' ]]; then
-        if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            isLogfile="true"
-        else
-            log_and_exit "Failed to create a logfile!" 6
-        fi
-    fi
-
-    # Check if the log file is writable and exit on failure
-    if [[ -w "$_LOGFILE"'.log' ]]; then
-        if touch "$_LOGFILE"'.log' 2>&1 | log_trace "[LGF]"; then
-            _FILELOGGER_ACTIVE='true'
-            [[ $isLogfile == 'true' ]] && log_message "Created log file: $_LOGFILE.log" 1
-            log_message "Logging initialised" 1
-        else
-            _FILELOGGER_ACTIVE="false"
-            log_and_exit "Failed to write to log file $_LOGFILE.log" 7
-        fi
-    else
-        log_and_exit "Log file $_LOGFILE.log is not writable!" 7
-    fi
-
+    [ "$_LOGFILEON" -ne 1 ] && return 2
     # Back up the logs, as specified by user
-    if [ "$_LFBKPNO" -gt 0 ]; then
+    if [ "$_LFBKPNO" -ne 0 ]; then
         shopt -s nullglob
         log_files=("${_LOGFILE}"_*.log)
         total_logs=${#log_files[@]}
         if [[ $total_logs -ge "$_LFBKPNO" ]]; then
-            oldlog=$(find . -type f -name "$(basename "${_LOGFILE}")_*" -printf "%T@ %p\n" | sort -n | head -1 | cut -f2- -d" ") # locate the oldest log
-            rm "$oldlog" 2>&1 | log_trace "[LGF]"                                                                                # FIFO rulez!
+            oldlog=$(find "$_BASEDIR" -type f -name "$(basename "${_LOGFILE}")_*" -printf "%T@ %p\n" | sort -n | head -1 | cut -d' ' -f2-) # locate the oldest log
+            [ -n "$oldlog" ] && rm "$oldlog" 2>&1 | log_trace "[LOG]"                                                                      # FIFO rulez!
         fi
 
         # Format the output
@@ -64,7 +39,19 @@ __init_logfile() {
             fmt='%d%m%Y_%H%M%S'
         fi
 
-        mv "$_LOGFILE"'.log' "$_LOGFILE"'_'"$(date +$fmt)"'.log' 2>&1 | log_trace "[LGF]" # back up the existing file
+        if [ -f "${_LOGFILE}"'.log' ]; then
+            mv "${_LOGFILE}"'.log' "${_LOGFILE}"'_'"$(date +$fmt)"'.log' 2>&1 | log_trace "[LOG]" # back up the existing file
+        fi
+    fi
+
+    # Create a log file
+    if [ ! -f "${_LOGFILE}"'.log' ]; then
+        if touch "${_LOGFILE}"'.log' 2>&1 | log_trace "[LOG]" && [ -w "${_LOGFILE}"'.log' ]; then
+            log_message "Created log file: ${_LOGFILE}.log" 1
+            log_message "Logging initialised" 1
+        else
+            log_and_exit "${FUNCNAME[0]}: Failed to create a logfile." 6
+        fi
     fi
 }
 
@@ -73,9 +60,9 @@ __init_vars() {
     # Arguments:    None.
     # Note:         Avoid changing the order of initialisation due to variable dependencies!
 
-    # Global constants with default values
-    _USERNAME=$(whoami)                                                                # user name
-    _APPSDIR="$HOME/Portables"                                                         # path to portable programs
+    # Global variables and constants with default values
+    _USERNAME=$(whoami)                                                                # user name; must be the first constant initialised
+    _APPSDIR="$HOME"/Portables                                                         # path to portable programs
     _AUTODRIVES=()                                                                     # USB drives to mount on each system boot
     _AUTOSTART=()                                                                      # packages to autostart on system reboot
     _AVATARDSTDIR='/usr/share/pixmaps/faces'                                           # source/destination directory for user avatar images
@@ -84,6 +71,7 @@ __init_vars() {
     _AVATARTXT=/var/lib/AccountsService/users/"$_USERNAME"                             # a text file with paths to user avatars
     _BASEDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)                             # script directory
     _BASHRC="$HOME"/.bashrc                                                            # user settings updated with every new shell session
+    _BINPATH="$HOME"/.local/bin                                                        # directory for prerequisite binaries
     _BOOKDIRS=()                                                                       # directories to bookmark to GNOME Files/Nautilus
     _CONFIG_FILE=''                                                                    # user configuration file
     _CONFIGS_DIR="$_BASEDIR"/data/configs                                              # source directory for user configuration files
@@ -95,16 +83,17 @@ __init_vars() {
     _ENDMSG='false'                                                                    # final message toggle
     _EXEC_START=$(date +%s)                                                            # script launch time
     _FFXADDONSURL='https://addons.mozilla.org/addon'                                   # main server to download Firefox addons
-    _FFXAPPINI="/usr/lib/firefox/application.ini"                                      # required Firefox settings
-    _FFXCHANNEL="/usr/lib/firefox/defaults/pref/channel-prefs.js"                      # Firefox channel info
+    _FFXAPPINI='/usr/lib/firefox/application.ini'                                      # required Firefox settings
+    _FFXCHANNEL=''                                                                     # Firefox channel info
+    _FFXCHANNELFILE='/usr/lib/firefox/defaults/pref/channel-prefs.js'                  # File with Firefox channel info
     _FFXCONFIG=0                                                                       # configure Firefox?
     _FFXCOOKIES=()                                                                     # Firefox cookies to keep
-    _FFXDIR="$HOME/.mozilla/firefox"                                                   # Firefox profile directory
+    _FFXDIR="$HOME"/.mozilla/firefox                                                   # Firefox profile directory
     _FFXEXTSLST=()                                                                     # list of installed Firefox extensions
     _FFXEXTS=()                                                                        # list of Firefox extensions
     _FFXHOMEPAGE=0                                                                     # set/unset custom homepage for Firefox
     _FFXPREFS='prefs.js'                                                               # Firefox preferences
-    _FFXPRF="$_USERNAME"                                                               # Firefox default profile directory
+    _FFXPRF=''                                                                         # Firefox default profile directory
     _FFXUSEROVERRIDES='user-overrides.js'                                              # Firefox user settings to override default ones (if _FFXPRIVACY enabled)
     _FFXPRIVACY=0                                                                      # enable/disable Firefox privacy settings
     _FILELOGGER_ACTIVE=false                                                           # log file status
@@ -112,7 +101,8 @@ __init_vars() {
     _GFAVOURITES=()                                                                    # favourite programs to dock
     _GNOMEXTS=()                                                                       # GNOME extensions
     _GNOMEXTSET=()                                                                     # GNOME extension settings
-    _GSETTINGS=()                                                                      # GNOME GSettings schema, key, and value
+    _GSETTINGS=()                                                                      # GNOME pre-configured GSettings
+    _GCSETTINGS=()                                                                     # GNOME custom GSettings (schema, key, and value)
     _GTKBKMRK="$HOME"/.config/gtk-3.0/bookmarks                                        # directory bookmarks on Files/Nautilus
     _GTKEXTS="$HOME"/.local/share/gnome-shell/extensions                               # default location for GNOME extensions
     _INSTALLERS=()                                                                     # .deb and other installer packages to install
@@ -127,26 +117,27 @@ __init_vars() {
     _LOGFILEON=1                                                                       # enable/disable log file
     _MAXWIN=1                                                                          # maximise window
     _MISC="$_BASEDIR"/data/misc                                                        # directory for miscellaneous files
-    _MSFONTS=1                                                                         # install Microsoft fonts
+    _MSFONTS=0                                                                         # install Microsoft fonts
     _OPTION=''                                                                         # any of the valid POPPI options: -[abcdfghprvx]
     _OS_RELEASE="/etc/os-release"                                                      # file with OS info
     _OS="Pop!_OS"                                                                      # operating system
-    _OVERAMPLIFY=1                                                                     # overamplify the system volume
+    _OVERAMPLIFY=0                                                                     # overamplify the system volume
     _PORTABLES=()                                                                      # an array of AppImages and other portable packages to install
     _POWERMODE='off'                                                                   # auto-suspend on/off
+    _SCHEMA="$_MISC"/schema.json                                                       # JSON schema for validation
     _SCREENLOCK=0                                                                      # screenlock period of inactivity
     _SCRIPT=$(basename "$0")                                                           # this script
-    _SETGEARY=1                                                                        # set email client Geary
-    _SETMONDAY=1                                                                       # set start of the week to Monday
+    _SETGEARY=0                                                                        # set email client Geary
+    _SETMONDAY=0                                                                       # set start of the week to Monday
     _STRLEN=$(($(tput cols) - 5))                                                      # width of field to print the log message; slightly less than terminal width to avoid string duplication
-    _TESTSERVER=duckduckgo.com                                                         # test server's URL
+    _TESTSERVER='duckduckgo.com'                                                       # test server's URL
     _TIMER=1                                                                           # enable/disable timer
     _USERAPPS="$HOME"/.local/share/applications                                        # .desktop launchers for portable programs
     _USERICONS="$HOME"/.local/share/icons                                              # icons for portable programs
     _USERID=$(id -u "$_USERNAME")                                                      # user login id
     _USERPROFILE="$HOME"/.profile                                                      # user profile directory (requires system reboot)
     _USERSESSION="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$_USERID/bus"           # user session, useful for crontab operations
-    _VERSION="0.9.3"                                                                   # script version
+    _VERSION="0.9.5"                                                                   # script version
     _VSIX=()                                                                           # extensions for VS Codium
     _WPEXTDIR=''                                                                       # external directory to source wallpapers
     _WPON=0                                                                            # enable custom wallpapers
@@ -179,16 +170,15 @@ __init_vars() {
     # set readonly status 'after' variable initialisation
     readonly _AVATARDSTDIR _BASEDIR _BASHRC _COMPRESSED_TYPES \
         _CONFIGS_DIR _CONFIGSP_DIR _DFTRMPRFL _DISPLAY _DOTFILES \
-        _FFXADDONSURL _FFXAPPINI _FFXCHANNEL _FFXDIR _FFXPREFS \
+        _FFXADDONSURL _FFXAPPINI _FFXCHANNELFILE _FFXDIR _FFXPREFS \
         _FFXUSEROVERRIDES _GTKBKMRK _GTKEXTS _LODIR _LOEXTSURL \
         _LOGFILE _MISC _OS_RELEASE _OS _SCRIPT _STRLEN _USERAPPS \
-        _USERICONS _USERID _USERPROFILE _USERSESSION
+        _USERICONS _USERID _USERNAME _USERPROFILE _USERSESSION
 }
 
 __load_configs() {
     # Description:  Loads user configuration settings from a JSON file.
     # Arguments:    None.
-    set_dependency "jq" >/dev/null 2>&1
     _JSON_DATA=$(jq '.' "$_CONFIG_FILE") # Load the contents of the user configuration file to memory
 
     # Define an associative array to map JSON keys to Bash variables
@@ -203,6 +193,7 @@ __load_configs() {
         ["MISCOPS.\"msc.gnome_extensions\""]="_GNOMEXTS"
         ["MISCOPS.\"msc.gnome_extension_settings\""]="_GNOMEXTSET"
         ["MISCOPS.\"msc.gnome_settings\""]="_GSETTINGS"
+        ["MISCOPS.\"msc.gnome_custom_settings\""]="_GCSETTINGS"
         ["PACKAGES.\"pkg.autostart\""]="_AUTOSTART"
         ["PACKAGES.\"pkg.portables\""]="_PORTABLES"
         ["PACKAGES.\"pkg.portables\".codium.extensions"]="_VSIX"
@@ -220,6 +211,10 @@ __load_configs() {
             elif [[ "$key" == "PACKAGES.\"pkg.installers\"" ]]; then
                 # Extract keys of installers where 'required' is 1
                 mapfile -t "$var_name" < <(echo "$_JSON_DATA" | jq -r '.PACKAGES."pkg.installers" | to_entries | map(select(.value.required == 1) | .key) | .[]')
+            # Extract subkeys and values for Gnome Settings
+            elif [[ "$key" == "MISCOPS.\"msc.gnome_settings\"" ]]; then
+                mapfile -t "$var_name" < <(echo "$_JSON_DATA" | jq -r '.MISCOPS."msc.gnome_settings" | to_entries | map(select(.value != null and .value != "")) | map(.key + ":" + (.value | tostring)) | .[]')
+
             else
                 mapfile -t "$var_name" < <(echo "$_JSON_DATA" | jq -r ".${key}[]")
             fi
@@ -227,52 +222,35 @@ __load_configs() {
     done
 
     # Extract and assign values to global colour variables
-    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CHEAD" '.GENERAL."gen.colour_head" // $default') && _CHEAD=$(set_colour "$usrVal" "$_CHEAD")
-    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CINFO" '.GENERAL."gen.colour_info" // $default') && _CINFO=$(set_colour "$usrVal" "$_CINFO")
-    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_COKAY" '.GENERAL."gen.colour_okay" // $default') && _COKAY=$(set_colour "$usrVal" "$_COKAY")
-    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CSTOP" '.GENERAL."gen.colour_stop" // $default') && _CSTOP=$(set_colour "$usrVal" "$_CSTOP")
-    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CWARN" '.GENERAL."gen.colour_warn" // $default') && _CWARN=$(set_colour "$usrVal" "$_CWARN")
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CHEAD" '.GENERAL."gen.colour_head" // $default | select(. != "") // $default') && _CHEAD=$(set_colour "$usrVal" "$_CHEAD")
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CINFO" '.GENERAL."gen.colour_info" // $default | select(. != "") // $default') && _CINFO=$(set_colour "$usrVal" "$_CINFO")
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_COKAY" '.GENERAL."gen.colour_okay" // $default | select(. != "") // $default') && _COKAY=$(set_colour "$usrVal" "$_COKAY")
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CSTOP" '.GENERAL."gen.colour_stop" // $default | select(. != "") // $default') && _CSTOP=$(set_colour "$usrVal" "$_CSTOP")
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_CWARN" '.GENERAL."gen.colour_warn" // $default | select(. != "") // $default') && _CWARN=$(set_colour "$usrVal" "$_CWARN")
 
     # Extract and assign other values to global variables
-    _LOGFILEFMT=$(echo "$_JSON_DATA" | jq -r --arg default "$_LOGFILEFMT" '.GENERAL."gen.logfile_format" // $default')
-    [[ ! "$_LOGFILEFMT" =~ ^(Metric|US)$ ]] && _LOGFILEFMT='Metric'
-    _LOGFILEON=$(echo "$_JSON_DATA" | jq -r --arg default "$_LOGFILEON" '.GENERAL."gen.logfile_on" // $default')
-    [[ ! "$_LOGFILEON" =~ ^[01]$ ]] && _LOGFILEON=1
-    _LFBKPNO=$(echo "$_JSON_DATA" | jq -r --arg default "$_LFBKPNO" '.GENERAL."gen.logfile_backup_no" // $default')
-    [[ ! "$_LFBKPNO" =~ ^[0-9][0-9]?$ ]] && _LFBKPNO=1
-    _MAXWIN=$(echo "$_JSON_DATA" | jq -r --arg default "$_MAXWIN" '.GENERAL."gen.maximise_window" // $default')
-    [[ ! "$_MAXWIN" =~ ^[01]$ ]] && _MAXWIN=1
-    _TIMER=$(echo "$_JSON_DATA" | jq -r --arg default "$_TIMER" '.GENERAL."gen.set_timer" // $default')
-    [[ ! "$_TIMER" =~ ^[01]$ ]] && _TIMER=1
-    _TESTSERVER=$(echo "$_JSON_DATA" | jq -r --arg default "$_TESTSERVER" '.GENERAL."gen.test_server" // $default')
-    [[ ! "$_TESTSERVER" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(/.*)?$ ]] && _TESTSERVER=duckduckgo.com
-    _AVATARON=$(echo "$_JSON_DATA" | jq -r --arg default "$_AVATARON" '.MISCOPS."msc.avatar_enable" // $default')
-    [[ ! "$_AVATARON" =~ ^[01]$ ]] && _AVATARON=1
-    _AVATARIMG=$(echo "$_JSON_DATA" | jq -r --arg default "$_AVATARIMG" '.MISCOPS."msc.avatar_image" // $default')
-    _MSFONTS=$(echo "$_JSON_DATA" | jq -r --arg default "$_MSFONTS" '.MISCOPS."msc.ms_fonts" // $default')
-    [[ ! "$_MSFONTS" =~ ^[01]$ ]] && _MSFONTS=1
-    _SETGEARY=$(echo "$_JSON_DATA" | jq -r --arg default "$_SETGEARY" '.MISCOPS."msc.set_geary" // $default')
-    [[ ! "$_SETGEARY" =~ ^[01]$ ]] && _SETGEARY=1
-    _SETMONDAY=$(echo "$_JSON_DATA" | jq -r --arg default "$_SETMONDAY" '.MISCOPS."msc.week_starts_on_monday" // $default')
-    [[ ! "$_SETMONDAY" =~ ^[01]$ ]] && _SETMONDAY=1
-    _OVERAMPLIFY=$(echo "$_JSON_DATA" | jq -r --arg default "$_OVERAMPLIFY" '.MISCOPS."msc.volume_overamplify" // $default')
-    [[ ! "$_OVERAMPLIFY" =~ ^[01]$ ]] && _OVERAMPLIFY=1
-    _WPON=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPON" '.MISCOPS."msc.wallpaper_on" // $default')
-    [[ ! "$_WPON" =~ ^[01]$ ]] && _WPON=0
-    _WPSRCDIR=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPSRCDIR" '.MISCOPS."msc.wallpaper_src_dir" // $default')
-    [[ ! -d "$_WPSRCDIR" ]] && _WPSRCDIR="$HOME"/Pictures/Wallpapers
-    _WPEXTDIR=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPEXTDIR" '.MISCOPS."msc.wallpaper_ext_dir" // $default')
-    [[ ! -d "$_WPEXTDIR" ]] && _WPEXTDIR=''
-    _FFXCONFIG=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXCONFIG" '.FIREFOX."ffx.configure" // $default')
-    [[ ! "$_FFXCONFIG" =~ ^[01]$ ]] && _FFXCONFIG=1
-    _FFXPRF=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXPRF" '.FIREFOX."ffx.profile" // $default')
-    [[ -z "$_FFXPRF" ]] && _FFXPRF="$_USERNAME"
-    _FFXPRIVACY=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXPRIVACY" '.FIREFOX."ffx.set_privacy" // $default')
-    [[ ! "$_FFXPRIVACY" =~ ^[01]$ ]] && _FFXPRIVACY=1
-    _FFXHOMEPAGE=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXHOMEPAGE" '.FIREFOX."ffx.set_homepage" // $default')
-    [[ ! "$_FFXHOMEPAGE" =~ ^[01]$ ]] && _FFXHOMEPAGE=1
-    _APPSDIR=$(echo "$_JSON_DATA" | jq -r --arg default "$_APPSDIR" '.PACKAGES."pkg.portables_dir" // $default')
-    [[ ! -d "$_APPSDIR" ]] && _APPSDIR="$HOME/Portables"
+    _LFBKPNO=$(echo "$_JSON_DATA" | jq -r --arg default "$_LFBKPNO" '.GENERAL."gen.logfile_backup_no" // $default | select(. != "") // $default')
+    _LOGFILEFMT=$(echo "$_JSON_DATA" | jq -r --arg default "$_LOGFILEFMT" '.GENERAL."gen.logfile_format" // $default | select(. != "") // $default')
+    _LOGFILEON=$(echo "$_JSON_DATA" | jq -r --arg default "$_LOGFILEON" '.GENERAL."gen.logfile_on" // $default | select(. != "") // $default')
+    _MAXWIN=$(echo "$_JSON_DATA" | jq -r --arg default "$_MAXWIN" '.GENERAL."gen.maximise_window" // $default | select(. != "") // $default')
+    _TIMER=$(echo "$_JSON_DATA" | jq -r --arg default "$_TIMER" '.GENERAL."gen.set_timer" // $default | select(. != "") // $default')
+    _TESTSERVER=$(echo "$_JSON_DATA" | jq -r --arg default "$_TESTSERVER" '.GENERAL."gen.test_server" // $default | select(. != "") // $default')
+    _AVATARON=$(echo "$_JSON_DATA" | jq -r --arg default "$_AVATARON" '.MISCOPS."msc.avatar_enable" // $default | select(. != "") // $default')
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_AVATARIMG" '.MISCOPS."msc.avatar_image" // $default | select(. != "") // $default')
+    [ -f "$_MISC/$usrVal" ] && _AVATARIMG="$usrVal"
+    _MSFONTS=$(echo "$_JSON_DATA" | jq -r --arg default "$_MSFONTS" '.MISCOPS."msc.ms_fonts" // $default | select(. != "") // $default')
+    _SETGEARY=$(echo "$_JSON_DATA" | jq -r --arg default "$_SETGEARY" '.MISCOPS."msc.set_geary" // $default | select(. != "") // $default')
+    _SETMONDAY=$(echo "$_JSON_DATA" | jq -r --arg default "$_SETMONDAY" '.MISCOPS."msc.week_starts_on_monday" // $default | select(. != "") // $default')
+    _OVERAMPLIFY=$(echo "$_JSON_DATA" | jq -r --arg default "$_OVERAMPLIFY" '.MISCOPS."msc.volume_overamplify" // $default | select(. != "") // $default')
+    _WPON=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPON" '.MISCOPS."msc.wallpaper_on" // $default | select(. != "") // $default')
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPSRCDIR" '.MISCOPS."msc.wallpaper_src_dir" // $default | select(. != "") // $default')
+    [[ -d "$usrVal" ]] && _WPSRCDIR="$usrVal"
+    _WPEXTDIR=$(echo "$_JSON_DATA" | jq -r --arg default "$_WPEXTDIR" '.MISCOPS."msc.wallpaper_ext_dir" // $default | select(. != "") // $default')
+    _FFXCONFIG=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXCONFIG" '.FIREFOX."ffx.configure" // $default | select(. != "") // $default')
+    _FFXHOMEPAGE=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXHOMEPAGE" '.FIREFOX."ffx.set_homepage" // $default | select(. != "") // $default')
+    _FFXPRIVACY=$(echo "$_JSON_DATA" | jq -r --arg default "$_FFXPRIVACY" '.FIREFOX."ffx.set_privacy" // $default | select(. != "") // $default')
+    usrVal=$(echo "$_JSON_DATA" | jq -r --arg default "$_APPSDIR" '.PACKAGES."pkg.portables_dir" // $default | select(. != "") // $default')
+    [[ -d "$usrVal" ]] && _APPSDIR="$usrVal"
 }
 
 __logger_core() {
@@ -293,43 +271,51 @@ __logger_core() {
             declare -r lvl_str="INFO"
             declare -r lvl_sym="•"
             declare -r lvl_color="${_CINFO}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         success)
             declare -r lvl_str="SUCCESS"
             declare -r lvl_sym="✓"
             declare -r lvl_color="${_COKAY}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         trace)
             declare -r lvl_str="TRACE"
             declare -r lvl_sym="~"
             declare -r lvl_color="${_CINFO}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         warn | warning)
             declare -r lvl_str="WARNING"
             declare -r lvl_sym="!"
             declare -r lvl_color="${_CWARN}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         error)
             declare -r lvl_str="ERROR"
             declare -r lvl_sym="✗"
             declare -r lvl_color="${_CSTOP}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         progress)
             declare -r lvl_str="PROGRESS"
             declare -r lvl_sym="»"
             declare -r lvl_color="${_CINFO}"
+            _FILELOGGER_ACTIVE='false'
             lvl_console="0"
             ;;
         prompt)
             declare -r lvl_str="PROMPT"
             declare -r lvl_sym="⸮"
             declare -r lvl_color="${_CWARN}"
+            _FILELOGGER_ACTIVE='false'
             lvl_console="2"
             ;;
         stage)
             declare -r lvl_str="STAGE"
             declare -r lvl_sym="—"
             declare -r lvl_color="${_CHEAD}"
+            _FILELOGGER_ACTIVE='true'
             ;;
         esac
     fi
@@ -342,7 +328,7 @@ __logger_core() {
         printf "\r%s%s%s %s %s\r" "${lvl_color}" "${lvl_prefix}" "${lvl_sym}" "${lvl_msg}" "${lvl_nc}" # progress reports on the same line ('\r')
     fi
 
-    if [[ $_FILELOGGER_ACTIVE == 'true' ]]; then
+    if [[ $_FILELOGGER_ACTIVE == 'true' && -f "$_LOGFILE"'.log' ]]; then
         printf "%s %-25s %-10s %s\n" "${lvl_ts}" "${FUNCNAME[2]}" "[${lvl_str}]" "$lvl_msg" >>"$_LOGFILE"'.log'
     fi
 }
@@ -354,12 +340,12 @@ __make_configs() {
 
     # Change to base directory or return error code if it fails
     cd "$_BASEDIR" || {
-        log_and_exit "Failed to access '$_BASEDIR'. Exiting ..." 4
+        log_and_exit "${FUNCNAME[0]}: Failed to access '$_BASEDIR'." 4
     }
 
     # Make a new configuration file
     if ! cat <<EOF >"$_BASEDIR"/configure.pop 2>&1 | log_trace "[MKC]"; then
-{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":"3","gen.logfile_format":"US","gen.logfile_on":"1","gen.maximise_window":"1","gen.set_timer":"1","gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":"0","ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.profile":"","ffx.set_homepage":"0","ffx.set_privacy":"1"},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdftocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"curl":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"jq":{"required":0},"keepassxc":{"required":0},"krita":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"stylish":{"required":0},"codium":{"required":0,"extensions":[],"settings":{"nameShort":"Visual Studio Code","nameLong":"Visual Studio Code","extensionsGallery":{"serviceUrl":"https://marketplace.visualstudio.com/_apis/public/gallery","cacheUrl":"https://vscode.blob.core.windows.net/gallery/index","itemUrl":"https://marketplace.visualstudio.com/items"}}},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":0,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":[],"msc.ms_fonts":"0","msc.set_geary":"0","msc.volume_overamplify":"0","msc.wallpaper_on":"0","msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":"0"}}
+{"GENERAL":{"gen.colour_head":"#48b9c7","gen.colour_info":"#949494","gen.colour_okay":"#4e9a0a","gen.colour_stop":"#ff3232","gen.colour_warn":"#f0e673","gen.logfile_backup_no":1,"gen.logfile_format":"Metric","gen.logfile_on":1,"gen.maximise_window":1,"gen.set_timer":1,"gen.test_server":"duckduckgo.com"},"FIREFOX":{"ffx.configure":0,"ffx.cookies_to_keep":[],"ffx.extensions":[],"ffx.set_homepage":0,"ffx.set_privacy":0},"PACKAGES":{"pkg.autostart":[],"pkg.installers":{"Calibre":{"required":0},"DConf-Editor":{"required":0},"FFMPEG_s":{"required":0},"FSearch":{"required":0},"LibreOffice":{"required":0,"extensions":[]},"lmsensors":{"required":0},"pdf.tocgen":{"required":0},"TeamViewer":{"required":0},"Virt-Manager":{"required":0}},"pkg.portables":{"audacity":{"required":0},"bleachbit":{"required":0},"cpux":{"required":0},"curl":{"required":0},"deadbeef":{"required":0},"hwprobe":{"required":0},"imagemagick":{"required":0},"inkscape":{"required":0},"jq":{"required":0},"keepassxc":{"required":0},"krita":{"required":0},"musescore":{"required":0},"neofetch":{"required":0},"qbittorrent":{"required":0},"smplayer":{"required":0},"sqlitebrowser":{"required":0},"styli.sh":{"required":0},"codium":{"required":0,"extensions":[]},"xnview":{"required":0},"xournalpp":{"required":0},"ytdlp":{"required":0}},"pkg.portables_dir":""},"MISCOPS":{"msc.automount_drives":[],"msc.avatar_enable":1,"msc.avatar_image":"popos.png","msc.bookmarked_dirs":[],"msc.crontab_cmds":[],"msc.gnome_calc_functions":[],"msc.gnome_custom_settings":[],"msc.gnome_extensions":[],"msc.gnome_extension_settings":[],"msc.gnome_favourites":[],"msc.gnome_settings":{"button_layout":"","button_position":"","capslock_as_extra_escape":0,"centre_windows_on_open":0,"check_alive_timeout":5000,"compose_key":"","font_scaling_factor":"1.0","font_terminal":"Fira Mono 12","font_ui":"Fira Sans Semi-Light 10","keyboard_languages":[],"launch_browser":"","launch_files":"","launch_settings":"","launch_terminal":"","set_wallpaper":"","show_seconds":0,"show_weekdays":0,"switch_workspace_down":"","switch_workspace_up":"","windows_close":"","windows_maximise":"","windows_minimise":""},"msc.ms_fonts":0,"msc.set_geary":0,"msc.volume_overamplify":0,"msc.wallpaper_on":0,"msc.wallpaper_src_dir":"","msc.wallpaper_ext_dir":"","msc.week_starts_on_monday":0}}
 EOF
         log_message "Creating user configuration file failed. Skipping ..." 3
     fi
@@ -377,7 +363,7 @@ __make_dirs() {
     for dir in "${Dirs[@]}"; do
         if [ ! -d "$_BASEDIR/data/$dir" ]; then
             if ! mkdir -p "$_BASEDIR/data/$dir"; then
-                log_and_exit "Failed to create directory '$_BASEDIR/data/$dir'. Exiting ..." 5
+                log_and_exit "${FUNCNAME[0]}: Failed to create directory '$_BASEDIR/data/$dir'." 5
             else
                 log_message "Created directory '$_BASEDIR/data/$dir'" 1
             fi
@@ -385,10 +371,24 @@ __make_dirs() {
     done
 }
 
+all() {
+    # Description:  Executes all operations in sequence.
+    # Arguments:    None.
+    # Note:         The order of functions may affect the performance of the script!
+    set_portables
+    set_installers
+    set_firefox
+    miscops
+    set_configs
+    set_gsettings
+    set_gnome_extensions
+    misc_set_avatar
+    set_favourites
+}
+
 bytes_to_human() {
     # Description:      Converts bytes to human-readable format. Used in `fetch_file()`.
     # Arguments:        One (1) - size of the downloaded file in bytes.
-
     local bytes=$1
     local size=('B' 'KB' 'MB' 'GB' 'TB')
     local factor=1024
@@ -408,7 +408,7 @@ check_internet() {
         if ping -c 4 -i 0.2 "$_TESTSERVER" >/dev/null 2>&1 | log_trace "[WEB]"; then
             log_message "Connected to the Internet" 1
         else
-            log_and_exit "You are not connected to the Internet,
+            log_and_exit "${FUNCNAME[0]}: You are not connected to the Internet,
     please check your network connection and try again." 8
         fi
     fi
@@ -416,8 +416,7 @@ check_internet() {
 
 check_user() {
     if [[ $EUID -eq 0 ]] || [[ $EUID -ne $_USERID ]]; then
-        log_and_exit "This script must be run by '$_USERNAME'.
-    Otherwise it can result in irreversible system-wide changes" 9
+        log_and_exit "${FUNCNAME[0]}: This script must be run by '$_USERNAME'." 9
     else
         log_message "Script run by '$_USERNAME'" 1
     fi
@@ -429,7 +428,7 @@ ${_CINFO}
 A set of post-installation methods developed for and tested on Pop!_OS 22.04 LTS.
 
   ${_CNONE}USAGE:${_CINFO}
-  ./${_SCRIPT} -[abcdfghprvx] [CONFIGURATION_FILE]
+  ./${_SCRIPT} -[abcdfghipvx] [CONFIGURATION_FILE]
 
   ${_CNONE}OPTIONS:${_CINFO}
   -a, --all                 Download, install and set everything
@@ -439,8 +438,8 @@ A set of post-installation methods developed for and tested on Pop!_OS 22.04 LTS
   -f, --set-firefox         Configure options for Firefox
   -g, --set-gsettings       Set GNOME GSettings
   -h, --help                Display this help message
+  -i, --set-installers      Install/update non-portable programs
   -p, --set-portables       Install/update portable programs
-  -r, --set-repos           Install/update non-portable programs
   -v, --version             Display version info
   -x, --gnome-extensions    Get and enable GNOME extensions
 
@@ -475,12 +474,12 @@ fetch_file() {
 
     # Check the number of arguments
     if [ $# -eq 0 ] || [ $# -gt 3 ]; then
-        log_and_exit "ERR: Wrong number of arguments for ${FUNCNAME[0]}: $#" 3
+        log_and_exit "${FUNCNAME[0]}: Wrong number of arguments: $#" 3
     fi
 
     # Check if ${1} is a valid URL
     if ! curl -sfIL "${1}" >/dev/null; then
-        log_and_exit "ERR: ${FUNCNAME[0]} argument \${1} not a valid URL: ${1}" 10
+        log_and_exit "${FUNCNAME[0]}: Not a valid URL: ${1}" 10
     fi
 
     # Assign arguments to variables
@@ -503,7 +502,7 @@ fetch_file() {
     # Update the download instead of re-downloading the file
     if [ -f "$loc/$filename" ]; then
         filesize=$(stat -c '%s' "$loc/$filename")
-        if [ "$filesize" != "$content_length" ]; then
+        if [ "$filesize" -lt "$content_length" ]; then
             log_message "Updating download for '$filename'..." 4 "$_STRLEN"
         else
             return 11
@@ -539,6 +538,8 @@ fetch_file() {
 ffx_extensions() {
     # Description:  Downloads and installs Firefox extensions.
     # Arguments:    None.
+    local counter ext_filename ext_title ext_total ext_URL extension tmpdir
+
     if [ "${#_FFXEXTS[@]}" -eq 0 ]; then
         log_message "No Firefox extensions to install. Skipping ..." 3
         return 1
@@ -610,6 +611,13 @@ ffx_extensions() {
 ffx_permissions() {
     # Description:  Uses a Python script to interact with the SQLite database
     # Arguments:    None.
+    local dbfile url
+
+    if ! set_dependency python3; then
+        log_message "Failed to locate Python on this system. Skipping ..." 3
+        return 15
+    fi
+
     if [ ${#_FFXCOOKIES[@]} -ne 0 ]; then
         dbfile="permissions.sqlite"
         python3 <<EOF
@@ -668,36 +676,34 @@ EOF
 }
 
 ffx_profile() {
-    # Description:  Identifies the Firefox profile.
+    # Description:  Identifies Firefox default profile.
     # Arguments:    None.
-    log_message "Identifying Firefox profile ..."
+    local profile
 
-    if [ -n "$_FFXPRF" ]; then
-        firefox -CreateProfile "$_FFXPRF-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
-        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*$_FFXPRF*" 2>&1)")
-        log_message "Firefox profile created for user $_FFXPRF" 1
-    elif [ -f "$_FFXDIR/profiles.ini" ]; then # identify profile directory, method #1
-        _FFXPRF=$(grep "[Default|Path]=.*\.default\-${channel}$" <"$_FFXDIR/profiles.ini" | cut -d= -f2 2>&1)
-        log_message "Default Firefox profile identified: $_FFXPRF" 1
+    profile="$_FFXDIR"/profiles.ini
+    log_message "[+] Identifying Firefox profile ..." 5
+    if [ -f "$profile" ]; then # method #1
+        _FFXPRF=$(grep -oE "^(Default|Path)=.*\-$_FFXCHANNEL$" "$profile" | cut -d= -f2 | head -1)
+        [ -n "$_FFXPRF" ] && log_message "Firefox default profile: $_FFXPRF" 1
     elif [ -d "$_FFXDIR" ]; then
         # Identify profile directory, method #2.
         # useful when script re-launched after first run in the background,
-        # when Firefox doesn't append 'Default=1' to the [Profile0] section of 'profiles.ini' (method #1).
-        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
-        log_message "Firefox profile identified: $_FFXPRF" 1
-    elif [ -d "$_FFXDIR" ]; then # both attempts failed, create a new one
-        firefox -CreateProfile "default-$channel" 2>&1 | log_trace "[FFX]" && sleep 3
-        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -name "*default*" 2>&1)")
-        log_message "Firefox profile created: $_FFXPRF" 1
+        # when Firefox doesn't append 'Default=1' to the [Profile0] section of 'profiles.ini' (as in method #1).
+        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -type d -name "*default*")")
+        [ -n "$_FFXPRF" ] && log_message "Firefox default profile for user '$_USERNAME': $_FFXPRF" 1
+    elif command -v firefox >/dev/null; then # both attempts failed, create a new profile
+        firefox -CreateProfile "default-$_FFXCHANNEL" 2>&1 | log_trace "[FFX]" && sleep 3
+        _FFXPRF=$(basename "$(find "$_FFXDIR" -maxdepth 1 -type d -name "*default*")")
+        [ -n "$_FFXPRF" ] && log_message "Firefox default profile for user '$_USERNAME' created: $_FFXPRF" 1
     else
-        log_message "Failed to create a profile. Skipping ..." 3
+        log_message "Failed to identify default Firefox profile. Skipping ..." 3
         return 5
     fi
 
     # Run Firefox in the background to populate the profile directory with necessary files.
-    firefox --headless -P "default-$channel" 2>&1 | log_trace "[FFX]" &
+    firefox --headless -P "default-$_FFXCHANNEL" 2>&1 | log_trace "[FFX]" &
     sleep 3
-    killffx
+    killproc firefox Firefox
 }
 
 ffx_xID() {
@@ -708,7 +714,7 @@ ffx_xID() {
     local xid xpi
 
     if [ $# -ne 1 ]; then
-        log_message "ERR: Wrong number of arguments for ${FUNCTION[0]}: $#" 3
+        log_message "${FUNCTION[0]}: Wrong number of arguments: $#" 3
         return 3
     fi
 
@@ -810,7 +816,7 @@ isExternalDir() {
 }
 
 isInstalled() {
-    # Description:  Checks if the Firefox exetnsion is installed.
+    # Description:  Checks if Firefox exetnsion is installed.
     # Arguments:    One (1) - exetnsion (XPI) file's name.
     local arg xTitle xFile
 
@@ -826,18 +832,28 @@ isInstalled() {
     return 13
 }
 
-killffx() {
-    # Description:  Kills Firefox, when necessary for certain operations; used in `set_firefox()`
-    # Arguments:    None.
-    local ffxproc
+killproc() {
+    # Description:  Kills running processes when necessary for certain operations; used in `set_firefox()` and `set_installers()`.
+    # Arguments:    Two (2)
+    #   -- executable to kill
+    #   -- executable title
+    local prc title
 
+    [ $# -eq 0 ] || [ $# -gt 2 ] && return 3
+    prc="${1}"
+    title="${2:-1}"
     while
-        ffxproc=$(pidof firefox)
-        [ -n "$ffxproc" ]
+        prc=$(pidof "$prc")
+        [ -n "$prc" ]
     do
-        log_trace "[FFX]" <<<"$(kill -9 "$ffxproc" 2>&1 >/dev/null)"
-        sleep 3
+        if kill -9 "$prc" >/dev/null; then
+            sleep 3
+            log_message "Process $prc suspended ($title)" 1
+            return 0
+        fi
     done
+
+    return 13
 }
 
 libreoffice_extensions() {
@@ -855,14 +871,24 @@ libreoffice_extensions() {
     fi
 
     log_message "[+] Setting up LibreOffice extensions ..." 5
-
     # Check and install extensions from the local LibreOffice directory, if available
-    if find "$_LODIR" -maxdepth 1 -type f -name '*.oxt' | grep -q .; then
+    if find "$_LODIR" -maxdepth 1 -type f -name '*.oxt' >/dev/null 2>&1; then
         for loextension in "$_LODIR"/*.oxt; do
+            extension=$(basename "$loextension")
+            # Check if extension is already installed
+            if unopkg list | grep -q "$extension"; then
+                log_message "Extension '$extension' already installed and activated. Skipping ..."
+                continue
+            fi
+
             log_message "[+] Installing '$loextension' ..." 5
-            unopkg add -s -f "$loextension" | log_trace "LOX"
+            unopkg add -s -f "$loextension" 2>&1 | log_trace "[LOX]"
+            # Unlock LO extension installer
+            if ! killproc unopkg; then
+                lockfile="$HOME"/.config/libreoffice/4/.lock
+                [ -f "$lockfile" ] && rm "$lockfile" && log_message "Lock file (unopkg) removed"
+            fi
         done
-        return 0
     fi
 
     for loextension in "${_LOEXTS[@]}"; do
@@ -880,7 +906,10 @@ libreoffice_extensions() {
                 gh_desc="Icon Theme Sifr"
                 log_message "Getting the latest version of ${gh_desc}..."
                 sfrurl="https://github.com/rizmut/$gh_repo/archive/master.tar.gz"
-                fetch_file $sfrurl "$gh_repo.tar.gz" "$_LODIR" && log_message "$gh_desc downloaded" 1
+                # Check if archive file available locally
+                if [ ! -f "$_LODIR/$gh_repo.tar.gz" ]; then
+                    fetch_file $sfrurl "$gh_repo.tar.gz" "$_LODIR" && log_message "$gh_desc downloaded" 1
+                fi
 
                 # Check the file's integrity
                 if tar -tf "$_LODIR/$gh_repo.tar.gz" &>/dev/null; then
@@ -934,8 +963,14 @@ libreoffice_extensions() {
             oxtURL=https://extensions.libreoffice.org/"$oxtURL"
             extension=$(basename "$oxtURL")
 
+            # Check if extension is already installed
+            if unopkg list | grep -q "$extension"; then
+                log_message "Extension '$ext_title' already installed and activated. Skipping ..."
+                continue
+            fi
+
             if [ -z "$oxtURL" ]; then
-                log_message "Extension '$ext_title' not found. Skipping ..." 3
+                log_message "Extension '$ext_title' not found on remote server. Skipping ..." 3
                 continue
             fi
 
@@ -946,7 +981,13 @@ libreoffice_extensions() {
                 continue
             fi
 
-            unopkg add -s -f "$_LODIR/$extension" 2>&1 | log_trace "LOX"
+            # Unlock LO extension installer
+            if ! killproc unopkg; then
+                lockfile="$HOME"/.config/libreoffice/4/.lock
+                [ -f "$lockfile" ] && rm "$lockfile" && log_message "Lock file (unopkg) removed"
+            fi
+
+            unopkg add -s -f "$_LODIR/$extension" 2>&1 | log_trace "[LOX]"
             if [ "${PIPESTATUS[0]}" -eq 0 ]; then
                 log_message "Extension $ext_title installed" 1 "$_STRLEN"
             else
@@ -1024,7 +1065,7 @@ log_trace() {
                 perc=$(grep -Eo '[0-9]*\.?[0-9]+%' <<<"$line" | cut -d\. -f1)
                 __logger_core "progress" "$(printf "%s %s" "${1:-NUL}" "Processing, please wait ... $perc%")"
             elif [[ "$line" =~ [WE]: ]]; then
-                log_and_exit "Try re-running the script in a few minutes" 14
+                log_and_exit "${FUNCNAME[0]}: Try re-running the script in a few minutes." 14
             else
                 __logger_core "trace" "$(printf "%s %s" "${1:-NUL}" "$line")"
             fi
@@ -1128,30 +1169,6 @@ misc_bookmark_dirs() {
     fi
 }
 
-misc_change_avatar() {
-    # Description:  Changes user's avatar on login screen.
-    # Arguments:    None.
-    [ "$_AVATARON" != 1 ] && return 2
-    local imgsrc
-
-    # Set locations for relevant user files
-    log_message "[+] Changing user avatar on login page ..." 5
-    if [ -f "$_MISC/$_AVATARIMG" ]; then
-        sudo cp "$_MISC/$_AVATARIMG" "$_AVATARDSTDIR" 2>&1 | log_trace "[MSC]"
-        imgsrc="$_AVATARDSTDIR/$_AVATARIMG"
-    else
-        imgsrc=$(shuf -e "$_AVATARDSTDIR"/* 2>/dev/null | head -n 1)
-    fi
-
-    # Modify the user file and copy the avatar
-    if sudo test -r "$_AVATARTXT"; then
-        sudo sed -i "/Icon/c\Icon=$imgsrc" "$_AVATARTXT" 2>&1 | log_trace "[MSC]"
-        [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "Avatar for user '$_USERNAME' changed" 1
-    else
-        log_message "Failed to change avatar for user '$_USERNAME'. Skipping ..." 3
-    fi
-}
-
 misc_connect_wifi() {
     # Description:  Checks Wi-Fi connection and re-connects the user, if necessary.
     # Arguments:    None.
@@ -1180,7 +1197,7 @@ misc_connect_wifi() {
 misc_gnome_calc_custom_functions() {
     # Description:  Adds custom functions to GNOME Calculator.
     # Arguments:    None.
-    [[ ${#_GCALC[@]} -eq 0 ]] && return 235
+    [[ ${#_GCALC[@]} -eq 0 ]] && return 3
     local func func_dir func_file
 
     func_dir="$HOME/.local/share/gnome-calculator"
@@ -1196,14 +1213,45 @@ misc_gnome_calc_custom_functions() {
 
         log_message "User-defined functions added to GNOME Calculator." 1
     else
-        log_message "Cannot add user-defined functions to GNOME Calculator. Skipping ..." 3
+        log_message "Failed to add user-defined functions to GNOME Calculator. Skipping ..." 3
+    fi
+}
+
+misc_set_avatar() {
+    # Description:  Changes user's avatar on login screen.
+    # Arguments:    None.
+    [ "$_AVATARON" != 1 ] && return 2
+    local imgsrc
+
+    # Set locations for user files
+    log_message "[+] Changing user avatar on login page ..." 5
+    # Check if avatar image set
+    if sudo grep -q "^Icon=.*$_AVATARIMG" "$_AVATARTXT"; then
+        log_message "Avatar already set. Skipping ..."
+        return 0
+    fi
+
+    # Set avatar image
+    if [ -f "$_MISC/$_AVATARIMG" ]; then
+        sudo cp "$_MISC/$_AVATARIMG" "$_AVATARDSTDIR" 2>&1 | log_trace "[MSC]"
+        imgsrc="$_AVATARDSTDIR/$_AVATARIMG"
+    else
+        imgsrc=$(shuf -e "$_AVATARDSTDIR"/* 2>/dev/null | head -n 1)
+    fi
+
+    # Modify the user file and copy the avatar
+    if sudo test -r "$_AVATARTXT"; then
+        sudo sed -i "/Icon/c\Icon=$imgsrc" "$_AVATARTXT" 2>&1 | log_trace "[MSC]"
+        [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "Avatar for user '$_USERNAME' changed" 1
+    else
+        log_message "Failed to change avatar for user '$_USERNAME'. Skipping ..." 3
     fi
 }
 
 misc_set_crontab() {
     # Description:  Appends select jobs to user's crontab.
     # Arguments:    None.
-    [ "${#_CRONLINE[@]}" -eq 0 ] && return 239
+    [ "${#_CRONLINE[@]}" -eq 0 ] && return 3
     log_message "[+] Setting up crontab jobs ..." 5
     local crondir
 
@@ -1225,7 +1273,7 @@ misc_set_crontab() {
 misc_set_geary() {
     # Description:  Sets options for GNOME Geary.
     # Arguments:    None.
-    [[ "$_SETGEARY" != 1 ]] && return 2
+    [[ "$_SETGEARY" -ne 1 ]] && return 2
     log_message "[+] Setting up GNOME Geary email client ..." 5
 
     if ! which geary 2>&1 | log_trace "[MSC]"; then
@@ -1239,12 +1287,17 @@ misc_set_geary() {
 misc_set_msfonts() {
     # Description:  Downloads Microsoft fonts from the external server.
     # Arguments:    None.
-    [[ "$_MSFONTS" != 1 ]] && return 2
+    [[ "$_MSFONTS" -ne 1 ]] && return 2
     local dl_url fileid fontdir pkglist tmpdir tmpurl
 
     log_message "[+] Setting up Microsoft fonts ..." 5
     fontdir="/usr/share/fonts/truetype/ms-fonts"
     tmpdir=$(mktemp -d)
+
+    if [ -d "$fontdir" ] && [ -n "$(ls -A1q "$fontdir")" ]; then
+        log_message "Microsoft fonts already set. Skipping ..."
+        return 0
+    fi
 
     # Define the external server's URLs
     if sudo mkdir -p $fontdir 2>&1 | log_trace "[MSC]"; then
@@ -1288,10 +1341,10 @@ misc_set_templates() {
 misc_set_volume() {
     # Description:  Over-amplifies the default setting for system volume.
     # Arguments:    None.
-    [[ "$_OVERAMPLIFY" != 1 ]] && return 2
+    [[ "$_OVERAMPLIFY" -ne 1 ]] && return 2
 
     log_message "[+] Setting volume over-amplification on ..." 5
-    if gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true; then
+    if gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true 2>&1 | log_trace "[MSC]"; then
         # max value 'amixer' shows when volume control set with mouse
         pactl set-sink-volume @DEFAULT_SINK@ 153% 2>&1 | log_trace "[MSC]" && log_message "Volume set to over-amplify" 1
     else
@@ -1302,15 +1355,20 @@ misc_set_volume() {
 misc_set_wallpaper() {
     # Description:  Enables the use of custom wallpapers.
     # Arguments:    None.
-    [ "$_WPON" != 1 ] && return 2
-    local count f resolution total_wprs urls wallpaper wpfile
+    [ "$_WPON" -ne 1 ] && return 2
+    log_message "[+] Setting up wallpapers ..." 5
+    local count f screen_resolution total_wprs urls wallpaper wpfile
 
     count=0
-    resolution=$(xdpyinfo | grep 'dimensions' | awk '{print $2}')
-
+    screen_resolution=$(xdpyinfo | grep 'dimensions' | awk '{print $2}')
     # Create a local directory for wallpapers
     if [ -n "$_WPSRCDIR" ] && mkdir -p "$_WPSRCDIR" >/dev/null 2>&1; then
         log_message "Directory '$_WPSRCDIR' available" 1
+        # Don't proceed any further, if user specified a custom wallpaper
+        if echo "${_GSETTINGS[@]}" | grep -q "set_wallpaper:\/"; then
+            wpfile=$(echo "${_GSETTINGS[@]}" | grep -oE "set_wallpaper:\/[^ ]*" | cut -d: -f2)
+            log_message "Wallpaper to be set: $wpfile" && return 0
+        fi
     else
         log_message "Failed to create directory '$_WPSRCDIR'. Skipping ..." 3
         return 5
@@ -1336,12 +1394,12 @@ misc_set_wallpaper() {
         fi
     else
         # Download a random wallpaper
-        urls=("$(curl -sfL "https://wallhaven.cc/api/v1/search?q=landscape&categories=101&purity=110&atleast=$resolution&sorting=random&order=desc&ai_art_filter=0" | bash -c "jq -r '.data[].path'")")
+        urls=("$(curl -sfL "https://wallhaven.cc/api/v1/search?q=landscape&categories=101&purity=110&atleast=$screen_resolution&sorting=random&order=desc&ai_art_filter=0" | bash -c "jq -r '.data[].path'")")
         wpfile=$(echo "${urls[*]}" | shuf -n 1)
         fetch_file "$wpfile" '' "$_WPSRCDIR"
     fi
 
-    # Set a wallpaper
+    # Set the wallpaper
     wallpaper=$(basename "$wpfile")
     if [ -f "$_WPSRCDIR/$wallpaper" ]; then
         gsettings set org.gnome.desktop.background picture-uri "file://$_WPSRCDIR/$wallpaper" &&
@@ -1358,7 +1416,7 @@ misc_set_weekday() {
     #
     # Note:         An alternative option might be `sudo sed -i -e 's:first_weekday\ 3:first_weekday\ 2:g' /usr/share/i18n/locales/en_US`,
     #               but less preferred, as it assumes reverse engineering the en_US locale.
-    [[ "$_SETMONDAY" != 1 ]] && return 2
+    [[ "$_SETMONDAY" -ne 1 ]] && return 2
 
     if [ "$LC_TIME" != 'en_GB.UTF-8' ] || ! grep -iq "export LC_TIME=.*en_gb\.utf\-8" "$_USERPROFILE"; then
         log_message "[+] Setting the first day of the week to Monday ..." 5
@@ -1400,7 +1458,7 @@ offline() {
     user_consent
     log_message "Initialisation and checks" 5
     __init_logfile
-    log_message "Permission checks" 5
+    log_message "[+] Permission checks ..." 5
     check_user
     system_check
 }
@@ -1416,8 +1474,11 @@ online() {
 }
 
 process_path() {
-    local path="${1}"
+    # Description:  Bookmarks processed path(s).
+    # Arguments:    One (1) - path to directory to be bookmarked.
+    local path
 
+    path="${1}"
     if [ -d "$path" ] || isExternalDir "$path"; then
         if [[ -z ${bookmarks["file://${path}"]} ]]; then # the same path is not bookmarked already
             printf "%s\n" "file://${path}" >>"${_GTKBKMRK}"
@@ -1431,7 +1492,7 @@ process_path() {
 }
 
 restart() {
-    # Description:  Restarts the system after system update and the successful completition of all the script operations.
+    # Description:  Restarts the system after system update and the successful completition of all the operations.
     # Arguments:    None.
     local sec
 
@@ -1548,25 +1609,56 @@ set_configs() {
 set_dependency() {
     # Description:  Installs packages required to run POPPI properly.
     # Arguments:    One (1) - dependency package to install.
-    [[ $# -eq 0 ]] && log_and_exit "ERR: ${FUNCNAME[0]} requires at least 1 argument" 3
-    local dep
+    [[ $# -eq 0 ]] && log_and_exit "${FUNCNAME[0]}: At least 1 (one) argument required." 3
+    local dep url
 
-    dep="$1"
     stop_packagekitd
+    # Set directory for binaries
+    if ! mkdir -p "$_BINPATH" 2>&1 | log_trace "[DEP]"; then
+        log_and_exit "${FUNCNAME[0]}: Failed to set '$_BINPATH'." 5
+    else
+        export PATH="$_BINPATH:$PATH"
+    fi
 
     # Iterate over each package provided as argument
     for dep in "$@"; do
-        log_message "[+] Installing dependency package '$dep'..." 5
-        if ! which "$dep" >/dev/null || ! [[ $(dpkg -l | grep "$dep") =~ ^ii.*"$dep" ]]; then # check for binary or package installation report;
-            if sudo apt-get install -y "${dep}" 2>&1 | log_trace "[DEP]"; then
-                [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "Dependency package '$dep' installed" 1
-            else
-                log_and_exit "Failed to install dependency package '$dep'" 16
-            fi
-        else
-            log_message "Dependency package '$dep' found"
+        log_message "[+] Setting dependency package '$dep' ..." 5
+
+        # Install the latest versions of prerequisites 'curl', 'jsonschema', and 'jq' — the three powerhorses of the script
+        # Fall back to default/installed versions, if fail.
+        if [ "$dep" == 'curl' ]; then
+            url=$(curl -sfL 'https://api.github.com/repos/moparisthebest/static-curl/releases/latest' | jq -r '.assets[].browser_download_url' | grep 'curl-amd64')
+        elif [ "$dep" == 'jq' ]; then
+            url=$(curl -sfL 'https://api.github.com/repos/jqlang/jq/releases/latest' | jq -r '.assets[].browser_download_url' | grep 'jq-linux-amd64')
         fi
+
+        if [ -n "$url" ]; then
+            fetch_file "$url" "$dep" "$_BINPATH" && chmod +x "$_BINPATH/$dep"
+            log_message "Binary package '$dep' downloaded and set" 1
+            continue
+        fi
+
+        if [[ "$dep" =~ ^(cmake|jsonschema|meson|ninja|pdf.tocgen)$ ]] && ! pip3 show "$dep" >/dev/null 2>&1; then
+            command -v pip3 >/dev/null || set_pip # Check if pip3 installed and install it, if not
+            pip3 install -U "$dep" | log_trace "[DEP]"
+            log_message "Python dependency package '$dep' installed" 1
+            continue
+        elif pip3 show "$dep" >/dev/null 2>&1; then
+            log_message "Python dependency package '$dep' found" 1
+            continue
+        fi
+
+        # Install the rest of dependencies, as necessary
+        if command -v "$dep" >/dev/null || dpkg -l | grep -q "^ii.*$dep"; then
+            log_message "Dependency package '$dep' found"
+        elif sudo apt-get install -y "${dep}" 2>&1 | log_trace "[DEP]"; then
+            [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "Dependency package '$dep' installed" 1
+        else
+            log_and_exit "${FUNCNAME[0]}: Failed to install dependency package '$dep'" 16
+        fi
+
     done
+
 }
 
 set_favourites() {
@@ -1617,28 +1709,28 @@ set_firefox() {
     # Arguments:    None.
     [[ "$_FFXCONFIG" != 1 ]] && return 2
     log_message "Setting up Firefox ..." 5
-    local channel counter ext_title ext_total ffv logstr url xid ext_URL
-    local arkenfox_files dbfile extension file UUID _XID tmpdir xpi
+    local ffv file url UUID
 
     # Firefox exists?
     if which firefox >/dev/null 2>&1 | log_trace "[FFX]"; then
         if [[ -f $_FFXAPPINI ]]; then
             ffv=$(grep "^Version" <"${_FFXAPPINI}" | cut -d= -f2 | cut -d\. -f1)
 
-            # compatibility check
+            # Compatibility check
             if [[ $ffv -le 89 ]]; then
                 log_message "Your version of Firefox is not compatible with this script.
     Please upgrade and re-run the script as './${_SCRIPT} -f' to apply Firefox settings." 3
                 return 17
             fi
 
-            if [[ -f "$_FFXCHANNEL" ]]; then
-                channel=$(grep "channel" <"$_FFXCHANNEL" | cut -d \" -f4)
+            # Check for Firefox channel info
+            if [[ -f "$_FFXCHANNELFILE" ]]; then
+                _FFXCHANNEL=$(grep "channel" <"$_FFXCHANNELFILE" | cut -d\" -f4)
             else
-                channel="undefined"
+                _FFXCHANNEL="undefined"
             fi
 
-            log_message "Mozilla Firefox version: ${ffv}-${channel}"
+            log_message "Mozilla Firefox version: ${ffv}-${_FFXCHANNEL}"
         else
             log_message "Failed to determine Firefox version" 3
         fi
@@ -1662,7 +1754,7 @@ set_firefox() {
 
         # Copy user's contents to Firefox profile
         if [ -d "$_BASEDIR"/data/firefox ]; then
-            cp -a "$_BASEDIR"/data/firefox/. "$_FFXDIR/$_FFXPRF"
+            cp -a "$_BASEDIR"/data/firefox/. "$_FFXDIR/$_FFXPRF" 2>&1 | log_trace "[FFX]"
         fi
 
         # Determine and Set UUID for GroupSpeedDial: this is a private case to ensure consistency between prefs.js and user-overrides.js
@@ -1673,7 +1765,7 @@ set_firefox() {
         if [ "$_FFXHOMEPAGE" -eq 1 ]; then
             firefox --headless -P "$(basename "$_FFXPRF" | cut -d\. -f2)" 2>&1 | log_trace "[FFX]" &
             sleep 7
-            killffx
+            killproc firefox Firefox
 
             if [ -f "$_FFXDIR/$_FFXPRF/$_FFXPREFS" ] && [ -f "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" ]; then
                 # Extract UUID from 'prefs.js'
@@ -1681,14 +1773,16 @@ set_firefox() {
 
                 # Check for UUID
                 if [ -z "$UUID" ]; then
-                    log_message "UUID not found in '$_FFXPREFS'. Skipping ..." 3
+                    log_message "GroupSpeedDial UUID not found in '$_FFXPREFS'. Skipping ..." 3
+                elif grep -q "$UUID" "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES"; then
+                    log_message "GroupSpeedDial UUID already set in '$_FFXUSEROVERRIDES'. Skipping ..."
                 else
-                    # Replace the UUID in user-overrides.js
+                    # Replace the UUID
                     sed -i "/browser\.startup\.homepage/c\user_pref\(\"browser\.startup\.homepage\"\,\ \"moz-extension\:\/\/$UUID\/dial\.html\"\);" "$_FFXDIR/$_FFXPRF/$_FFXUSEROVERRIDES" &&
-                        log_message "UUID replaced successfully in '$_FFXUSEROVERRIDES'" 1
+                        log_message "GroupSpeedDial UUID replaced successfully in '$_FFXUSEROVERRIDES'" 1
                 fi
             else
-                log_message "Preference files are missing. Skipping ..." 3
+                log_message "File '$_FFXPREFS' missing. Skipping ..." 3
             fi
         fi
     else
@@ -1699,11 +1793,9 @@ set_firefox() {
     # Set Arkenfox stuff
     if [ "$_FFXPRIVACY" -eq 1 ]; then
         if [ -f "$_FFXDIR/$_FFXPRF/user-overrides.js" ]; then
-            declare -a arkenfox_files=(updater.sh prefsCleaner.sh user.js)
-
-            for file in "${arkenfox_files[@]}"; do
-                url="https://raw.githubusercontent.com/arkenfox/user.js/master/$file"
-                fetch_file "$url" "" "$_FFXDIR/$_FFXPRF" && log_message "Downloaded '$file' to '$_FFXDIR/$_FFXPRF'" 1
+            for file in updater.sh prefsCleaner.sh user.js; do
+                url=https://raw.githubusercontent.com/arkenfox/user.js/master/"$file"
+                fetch_file "$url" "$file" "$_FFXDIR/$_FFXPRF" && log_message "Downloaded '$file' to '$_FFXDIR/$_FFXPRF'" 1
             done
 
             # Set permissions to user preference files
@@ -1731,7 +1823,7 @@ set_gnome_extensions() {
     # Description:  Downloads and enables GNOME extensions.
     # Arguments:    None.
     local download_url dKey dVal encoded_search_term ext_data extension extensions extensions_list
-    local filename gnome_version id parameter search_path tmp_dir UUIDs
+    local filename gnome_version id parameter schema search_path tmp_dir uuid UUIDs
 
     if which gnome-extensions >/dev/null 2>&1 | log_trace "[GNM]" && [ "${#_GNOMEXTS[@]}" -ne 0 ]; then
         log_message "Installing GNOME extensions ..." 5
@@ -1783,10 +1875,8 @@ set_gnome_extensions() {
     # Enable GNOME extensions
     if [ "${#_GNOMEXTSET}" -ne 0 ]; then
         log_message "[+] Enabling GNOME extensions ..." 5
-
         # Restart the shell; otherwise extensions cannot be enabled
         pgrep "gnome-shell" >/dev/null && killall -3 gnome-shell && sleep 3
-
         if mkdir -p "$_GTKEXTS"; then
             for ((id = 0; id < "${#UUIDs[@]}"; id++)); do
                 if gnome-extensions enable "${UUIDs[$id]}" 2>&1 | log_trace "[GNM]"; then
@@ -1825,14 +1915,144 @@ set_gnome_extensions() {
 set_gsettings() {
     # Desription:   Sets GNOME Gsettings parameters for the user.
     # Arguments:    None.
-    # Discussion: https://www.reddit.com/r/gnome/comments/vz37z2
-    # Custom keybindings: https://www.suse.com/support/kb/doc/?id=000019319
-    [ ${#_GSETTINGS[@]} -eq 0 ] && return 1
-    local key schema setting value
+    local jKey jVal key l langs schema setting value xkb_lng xkb_options
 
     log_message "Setting GNOME settings for user '$_USERNAME' ..." 5
+    # Store the existing value of 'xkb-options' to ensure non-destructive processing of settings.
+    # The string will be appended, as necessary.
+    xkb_options=$(gsettings get org.gnome.desktop.input-sources xkb-options | sed -E 's/^\[(.*)\]$/\1/')
+
+    # Set pre-defined GSettings
     for setting in "${_GSETTINGS[@]}"; do
-        # Expand the variables in JSON data, if any
+        jKey="${setting%\:*}"
+        jVal="${setting#*\:}"
+
+        # Check individual values instead of the state of _GSETTINGS().
+        # Otherwise, the function will exit prematurely before processing custom settings down below.
+        [ -z "$jVal" ] && continue
+
+        case "$jKey" in
+        button_layout)
+            gsettings set org.gnome.desktop.wm.preferences button-layout "'appmenu:${jVal}'"
+            ;;
+        button_position)
+            if [ "$jVal" == 'left' ]; then
+                value=$(gsettings get org.gnome.desktop.wm.preferences button-layout)
+                value="${value#*\:}" && value="${value%\'*}"
+                gsettings set org.gnome.desktop.wm.preferences button-layout "'${value}:'"
+            fi
+            ;;
+        capslock_as_extra_escape)
+            if [ "${xkb_options:0:1}" == '@' ]; then # the value is empty
+                xkb_options="'caps:escape'"
+            elif [ "$jVal" -eq 1 ] && ! grep -q "'caps:escape'" <<<"$xkb_options"; then
+                xkb_options=${xkb_options}", 'caps:escape'" # Append a new value to the string
+            fi
+            ;;
+        centre_windows_on_open)
+            if [ "$jVal" -eq 1 ]; then
+                gsettings set org.gnome.mutter center-new-windows true
+            else
+                gsettings reset org.gnome.mutter center-new-windows
+            fi
+            ;;
+        check_alive_timeout)
+            gsettings set org.gnome.mutter check-alive-timeout "$jVal"
+            ;;
+        compose_key)
+            if [ "${xkb_options:0:1}" == '@' ]; then # the value is empty
+                xkb_options="'compose:$jVal'"
+            elif ! grep -q "'compose:$jVal'" <<<"$xkb_options"; then
+                xkb_options=${xkb_options}", 'compose:$jVal'"
+            fi
+            ;;
+        font_scaling_factor)
+            gsettings set org.gnome.desktop.interface text-scaling-factor "$jVal"
+            ;;
+        font_terminal)
+            gsettings set org.gnome.Terminal.Legacy.Profile:/org/gnome/terminal/legacy/profiles:/:"$_DFTRMPRFL"/ font "$jVal"
+            ;;
+        font_ui)
+            gsettings set org.gnome.desktop.interface font-name "$jVal"
+            ;;
+        keyboard_languages)
+            IFS=,
+            read -ra langs <<<"$jVal"
+            for l in "${langs[@]}"; do
+                xkb_lng=${xkb_lng}"('xkb', '$l'), "
+            done
+
+            xkb_lng="[${xkb_lng%,*}]" # remove the trailing comma
+            gsettings set org.gnome.desktop.input-sources sources "$xkb_lng"
+            ;;
+        launch_browser)
+            gsettings set org.gnome.settings-daemon.plugins.media-keys www "['$jVal']"
+            ;;
+        launch_files)
+            gsettings set org.gnome.settings-daemon.plugins.media-keys home "['$jVal']"
+            ;;
+        launch_settings)
+            gsettings set org.gnome.settings-daemon.plugins.media-keys control-center "['$jVal']"
+            ;;
+        launch_terminal)
+            gsettings set org.gnome.settings-daemon.plugins.media-keys terminal "['$jVal']"
+            ;;
+        set_wallpaper)
+            if [ -f "$jVal" ] && [ -d "$_WPSRCDIR" ]; then
+                cp "$jVal" "$_WPSRCDIR"
+                jVal=$(basename "$jVal")
+                gsettings set org.gnome.desktop.background picture-uri "'file://$_WPSRCDIR/$jVal'"
+                gsettings set org.gnome.desktop.background picture-uri-dark "'file://$_WPSRCDIR/$jVal'"
+            fi
+            ;;
+        show_seconds)
+            if [ "$jVal" -eq 1 ]; then
+                gsettings set org.gnome.desktop.interface clock-show-seconds true
+            else
+                gsettings reset org.gnome.desktop.interface clock-show-seconds
+            fi
+            ;;
+        show_weekdays)
+            if [ "$jVal" -eq 1 ]; then
+                gsettings set org.gnome.desktop.interface clock-show-weekday true
+            else
+                gsettings reset org.gnome.desktop.interface clock-show-weekday
+            fi
+            ;;
+        switch_workspace_down)
+            gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-down "['$jVal']"
+            ;;
+        switch_workspace_up)
+            gsettings set org.gnome.desktop.wm.keybindings switch-to-workspace-up "['$jVal']"
+            ;;
+        windows_close)
+            gsettings set org.gnome.desktop.wm.keybindings close "['$jVal']"
+            ;;
+        windows_maximise)
+            gsettings set org.gnome.desktop.wm.keybindings maximize "['$jVal']"
+            ;;
+        windows_minimise)
+            gsettings set org.gnome.desktop.wm.keybindings minimize "['$jVal']"
+            ;;
+        *)
+            command
+            ;;
+        esac
+    done
+
+    # Write the full string back
+    if [ -n "$xkb_options" ]; then
+        gsettings set org.gnome.desktop.input-sources xkb-options "[${xkb_options}]"
+    fi
+
+    if [ ${#_GCSETTINGS[@]} -eq 0 ]; then
+        log_message "No extra GNOME settings to process. Skipping ..." 3
+        return 1
+    fi
+
+    # Set custom GSettings
+    for setting in "${_GCSETTINGS[@]}"; do
+        # Expand the Bash variables in JSON data, if any
         if [[ $setting == *'$'* ]]; then
             setting=$(eval echo "\"$setting\"")
         fi
@@ -1842,6 +2062,408 @@ set_gsettings() {
     done
 
     log_message "GNOME settings set" 1
+}
+
+set_installers() {
+    # Description:  Downloads and installs packages that require installation (e.g., .DEB files).
+    # Arguments:    None.
+    log_message "Initialising installation of additional programs ..." 5
+    local CFLAGS LDFLAGS PKG_CONFIG_PATH amr amr_DIR debfile direx file filename gsm gsm_DIR
+    local lame lame_DIR libex opus opus_DIR package perc speex speex_DIR temp_dir title url version
+
+    # Check if the global array variable is not empty
+    if [ "${#_INSTALLERS[@]}" -eq 0 ]; then
+        log_message "Nothing to install. Skipping ..." 3
+        return 1
+    fi
+
+    stop_packagekitd
+    temp_dir=$(mktemp -d)
+    for title in "${_INSTALLERS[@]}"; do
+        package="${title,,}" # convert to lowercase
+        log_message "[+] Installing $title ..." 5
+        case "$package" in
+        calibre)
+            if ! which "$package" >/dev/null 2>&1; then
+                set_dependency "libxcb-cursor0"
+                url='https://download.calibre-ebook.com/linux-installer.sh'
+                filename=$(basename "$url")
+                fetch_file "$url" "$filename" "$temp_dir"
+                chmod +x "$temp_dir"/linux-installer.sh
+                echo
+                sudo sh "$temp_dir"/linux-installer.sh 2>&1 | log_trace "[INS]"
+                [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "$title installation complete" 1
+                rm "$temp_dir"/linux-installer.sh >/dev/null 2>&1 | log_trace "[INS]"
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+            ;;
+        dconf-editor)
+            if ! which "$package" >/dev/null 2>&1; then
+                sudo apt-get install "$package" 2>&1 | log_trace "[INS]"
+                [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "$title installation complete" 1
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+            ;;
+        ffmpeg_s)
+            # shellcheck disable=2034,2154
+            if ! which ffmpeg >/dev/null 2>&1; then
+                cd "$temp_dir" || return 4
+
+                # Install dependencies
+                set_dependency autoconf \
+                    automake \
+                    build-essential \
+                    checkinstall \
+                    cmake \
+                    git-core \
+                    libass-dev \
+                    libfreetype6-dev \
+                    libgnutls28-dev \
+                    libmp3lame-dev \
+                    libsdl2-dev \
+                    libtool \
+                    libunistring-dev \
+                    libva-dev \
+                    libvdpau-dev \
+                    libvorbis-dev \
+                    libxcb1-dev \
+                    libxcb-shm0-dev \
+                    libxcb-xfixes0-dev \
+                    meson \
+                    nasm \
+                    ninja \
+                    pkg-config \
+                    texinfo \
+                    wget \
+                    yasm \
+                    zlib1g-dev | log_trace "[INS]"
+
+                # Download extra libraries and set prerequisites
+                log_message "[+] Processing extra libraries ..." 5
+                mkdir -p "$temp_dir/build"
+                mkdir -p "$temp_dir/build/local/include"
+                mkdir -p "$temp_dir/build/local/lib"
+                mkdir -p "$temp_dir/build/local/lib/pkgconfig"
+                mkdir -p "$temp_dir/Output"
+                export CPPFLAGS="-fPIC"
+                export CFLAGS="-fPIC"
+                export CXXFLAGS="-fPIC"
+                export LDFLAGS="-fPIC"
+                export PATH="$HOME/bin:$PATH"
+                PKG_CONFIG_PATH="$temp_dir/build/local/lib/pkgconfig"
+                export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+
+                gsm='http://www.quut.com/gsm/gsm-1.0.22.tar.gz'
+                speex='http://downloads.us.xiph.org/releases/speex/speex-1.2.1.tar.gz'
+                amr='https://downloads.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-0.1.5.tar.gz'
+                lame='https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz'
+                opus='https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz'
+
+                for libex in gsm speex amr lame opus; do
+                    eval url="\$$libex"
+                    filename=$(basename "$url")
+
+                    if [ ! -f "$filename" ]; then
+                        if ! fetch_file "$url" "$filename" "."; then
+                            log_message "Failed to download required library. Please check if URLs are valid" 3
+                            return 20
+                        fi
+                    fi
+
+                    # Extract the libraries
+                    eval direx="$(tar tf "$filename" | sed -e '1s/\/.*//;2,$d')"
+                    [ ! -x "$direx" ] && tar xf "$filename"
+                    eval "${libex}_DIR"="$direx"
+                done
+
+                # Set library GSM
+                if true; then
+                    cd "$gsm_DIR" || return 4
+                    make CCINC="${CFLAGS}" LDINC="${LDFLAGS}" lib/libgsm.a 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "GSM make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    mkdir -p "$temp_dir/build/local/include/gsm"
+                    cp -pR inc/* "$temp_dir/build/local/include/gsm" 2>&1 | log_trace "[INS]"
+                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[INS]"
+                    cd ..
+                fi
+
+                # Set library Speex
+                if true; then
+                    cd "$speex_DIR" || return 4
+                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Speex configure failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C libspeex 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Speex make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C include 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Speex make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    cp -pR include/* "$temp_dir/build/local/include" 2>&1 | log_trace "[INS]"
+                    cp -pR speex.pc "$temp_dir/build/local/lib/pkgconfig" 2>&1 | log_trace "[INS]"
+                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[INS]"
+                    cd ..
+                fi
+
+                # Set library Lame
+                if true; then
+                    cd "$lame_DIR" || return 4
+                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-frontend 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Lame configure failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C mpglib 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Lame mpglib make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C libmp3lame 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Lame libmp3lame make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    mkdir -p "$temp_dir/build/local/include/lame"
+                    cp -p include/* "$temp_dir/build/local/include/lame" 2>&1 | log_trace "[INS]"
+                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[INS]"
+                    cd ..
+                fi
+
+                # Set library Opus
+                if true; then
+                    cd "$opus_DIR" || return 4
+                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-doc --disable-extra-programs 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Opus configure failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Opus make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    cp -pR opus.pc "$temp_dir/build/local/lib/pkgconfig" 2>&1 | log_trace "[INS]"
+                    cp -pR include/opus.h include/opus_multistream.h include/opus_types.h include/opus_defines.h include/opus_projection.h "$temp_dir/build/local/include" 2>&1 | log_trace "[INS]"
+                    cp -pR "$(find .libs -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[INS]"
+                    cd ..
+                fi
+
+                # Set library Opencore-AMR
+                if true; then
+                    cd "$amr_DIR" || return 4
+                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Opencore-AMR configure failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C amrnb 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Opencore-AMRNB make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -C amrwb 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "Opencore-AMRWB make failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    mkdir -p "$temp_dir/build/local/include/opencore-amrnb"
+                    mkdir -p "$temp_dir/build/local/include/opencore-amrwb"
+                    cp -pR amrnb/*.h "$temp_dir/build/local/include/opencore-amrnb" 2>&1 | log_trace "[INS]"
+                    cp -pR amrwb/*.h "$temp_dir/build/local/include/opencore-amrwb" 2>&1 | log_trace "[INS]"
+                    # shellcheck disable=2038
+                    find . -name "*.a" | xargs -I {} cp -pR {} "$temp_dir/build/local/lib" 2>&1 | log_trace "[INS]"
+                    cd ..
+                fi
+
+                # Download and extract FFMPEG
+                log_message "[+] Processing $title ..." 5
+                url=$(curl -sfL 'https://ffmpeg.org/download.html' | grep -o "http.*.tar.xz")
+                filename=$(basename "$url")
+                fetch_file "$url" "$filename" "."
+
+                if which checkinstall >/dev/null; then
+                    tar_extractor "./$filename" 'nul' "." 2>&1 | log_trace "[INS]"
+                    version="$(<VERSION)"
+
+                    # Alternative way to determine FFMPEG version
+                    if [ -z "$version" ]; then
+                        version="${filename#*\-}"
+                        version="${version%\.tar*}"
+                    fi
+
+                    # Set FFMPEG configuration parameters
+                    sh ./configure \
+                        --pkg-config-flags="--static" \
+                        --toolchain=hardened \
+                        --arch=x86_64 \
+                        --disable-avdevice \
+                        --disable-debug \
+                        --disable-doc \
+                        --disable-static \
+                        --disable-stripping \
+                        --enable-gnutls \
+                        --enable-gpl \
+                        --enable-libgsm \
+                        --enable-libmp3lame \
+                        --enable-libopencore-amrnb \
+                        --enable-libopencore-amrwb \
+                        --enable-libopus \
+                        --enable-libpulse \
+                        --enable-libspeex \
+                        --enable-nonfree \
+                        --enable-pthreads \
+                        --enable-shared \
+                        --enable-version3 \
+                        --extra-cflags="-I./build/local/include" \
+                        --extra-ldflags="-L./build/local/lib" \
+                        --extra-libs="-lpthread -lm" 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "$title configure failed. Skipping ..." 3
+                        return 16
+                    fi
+
+                    make -j"$(nproc)" 2>&1 | log_trace "[INS]"
+                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+                        log_message "$title make failed. Skipping ..."
+                        return 16
+                    fi
+
+                    log_message "[+] Creating a Debian file with checkinstall ..." 5
+                    sudo checkinstall --install=no --pakdir="$HOME"/Downloads --pkgname=FFMPEG --pkgversion="$version" -y 2>&1 | log_trace "[INS]"
+
+                    # Find the .DEB file created by checkinstall
+                    debfile=$(find "$HOME/Downloads" -maxdepth 1 -type f -iname "*.DEB")
+
+                    # Copy the .DEB file and set user rights
+                    if [ -n "$debfile" ]; then
+                        sudo mv "$debfile" "$HOME/Downloads/ffmpeg-$version.deb" 2>&1 | log_trace "[INS]" &&
+                            sudo chown "$_USERID":"$_USERNAME" "$HOME/Downloads/ffmpeg-$version.deb" 2>&1 | log_trace "[INS]" &&
+                            log_message "File renamed to '$HOME/Downloads/ffmpeg-$version.deb'" 1
+                    else
+                        log_message "No .DEB file found at '$HOME/Downloads'" 3
+                    fi
+
+                    if which "$package" >/dev/null 2>&1; then
+                        log_message "$title installation complete" 1
+                    fi
+                else
+                    log_message "Cannot continue $title installation.
+                Please make sure 'yasm', 'checkinstall' installed, and/or archive intact" 3
+                    return 15
+                fi
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+
+            cd ..
+            ;;
+        fsearch)
+            if ! which fsearch >/dev/null 2>&1; then
+                sudo add-apt-repository --yes ppa:christian-boxdoerfer/fsearch-daily 2>&1 | log_trace "[INS]"
+                sudo apt-get update 2>&1 | log_trace "[INS]"
+                sudo apt-get install "$package" 2>&1 | log_trace "[INS]"
+                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                    log_message "$title installation complete" 1
+                else
+                    log_message "$title installation failed" 3
+                fi
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+            ;;
+        libreoffice)
+            if ! find /etc/apt/ -name "$package*.list" -print0 | xargs -0 cat | grep -q "^deb https.*ubuntu" 2>&1 | log_trace "[INS]"; then
+                log_message "[+] Updating $title repository ..."
+                sudo add-apt-repository --yes ppa:"$package"/ppa 2>&1 | log_trace "[INS]" &&
+                    log_message "$title repository updated" 1
+            else
+                log_message "$title repository is up-to-date. Skipping ..."
+            fi
+
+            libreoffice_extensions
+            ;;
+        lmsensors)
+            if ! which sensors >/dev/null 2>&1; then
+                sudo apt-get install lm-sensors 2>&1 | log_trace "[INS]"
+                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                    log_message "lm-sensors installation complete" 1
+                else
+                    log_message "lm-sensors installation failed" 3
+                fi
+            else
+                log_message "lm-sensors already installed. Skipping ..."
+            fi
+            ;;
+        pdf.tocgen)
+            set_dependency "$package"
+            ;;
+        teamviewer)
+            if ! which "$package" >/dev/null 2>&1; then
+                url='https://download.teamviewer.com/download/linux/teamviewer_amd64.deb'
+                filename=$(basename "$url")
+                cd "$temp_dir" || return 4
+                fetch_file "$url" "$filename" "."
+                sudo apt-get install "./$filename" -y 2>&1 | log_trace "[INS]"
+                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                    log_message "$title installation complete" 1
+                else
+                    log_message "$title installation failed" 3
+                fi
+
+                cd ..
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+            ;;
+        virt-manager)
+            if ! which "$package" >/dev/null 2>&1; then
+                sudo apt-get install "$package" -y 2>&1 | log_trace "[INS]"
+                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                    log_message "Virtualisation Manager installation complete" 1
+                else
+                    log_message "Virtualisation Manager installation failed" 3
+                fi
+            else
+                log_message "Virtualisation Manager already installed. Skipping ..."
+            fi
+            ;;
+        *)
+            if ! which "$package" >/dev/null 2>&1; then
+                sudo apt-get install "$package" 2>&1 | log_trace "[INS]"
+                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                    log_message "$title installation complete" 1
+                else
+                    log_message "$title installation failed" 3
+                fi
+            else
+                log_message "$title already installed. Skipping ..."
+            fi
+            ;;
+        esac
+    done
 }
 
 set_permission() {
@@ -1857,16 +2479,34 @@ set_permission() {
     if chown -R "$_USERID":"$_USERNAME" "$arg" && chmod -R 774 "$arg"; then
         log_message "User '$_USERNAME' set RWX permissions for $arg" 1
     else
-        log_and_exit "Failed to set permissions for $arg" 19
+        log_and_exit "${FUNCNAME[0]}: Failed to set permissions for $arg" 19
     fi
+}
+
+set_pip() {
+    # Description:  Installs `pip` — a package installer for Python.
+    # Arguments:    None.
+    local filename tmpdir url
+
+    if ! command -v pip3; then
+        url='https://bootstrap.pypa.io/get-pip.py'
+        filename=$(basename "$url")
+        tmpdir=$(mktemp -d)
+        fetch_file "$url" "$filename" "$tmpdir"
+        python3 "$tmpdir/$filename" 2>&1 | log_trace "[PIP]"
+        chmod +x "$_BINPATH"/pip* 2>&1 | log_trace "[PIP]"
+        return 0
+    fi
+
+    return 13
 }
 
 set_portables() {
     # Description:  Downloads and installs portable packages, including AppImages, etc.
     # Arguments:    None.
-    log_message "Initialising the download of portable packages ..." 5
-    local cmd codium_dir dirs extension extensions_dir filename full_url icon_file icon_path
-    local launcher_file name portable portables pref_package temp_dir tmp_url
+    log_message "Initialising the setup of portable packages ..." 5
+    local cmd codium_dir dirs extension filename full_url icon_file icon_path
+    local jqcmd launcher_file name portable portables pref_package temp_dir tmp_url
 
     # Check if the global array variable is not empty
     if [ "${#_PORTABLES[@]}" -eq 0 ]; then
@@ -1893,7 +2533,7 @@ set_portables() {
         'QBittorrent;qbittorrent;https://www.qbittorrent.org/download.php;grep -P ".*sourceforge.*\d_x86_64\.AppImage\/download" | cut -d\" -f4 | head -1'
         "SMPlayer;smplayer;https://api.github.com/repos/smplayer-dev/smplayer/releases/latest;$jqcmd"
         "SQLite Browser;sqlitebrowser;https://api.github.com/repos/sqlitebrowser/sqlitebrowser/releases/latest;$jqcmd"
-        "Styli.sh;stylish;https://raw.githubusercontent.com/thevinter/styli.sh/master/styli.sh;n/a"
+        "Styli.sh;styli.sh;https://raw.githubusercontent.com/thevinter/styli.sh/master/styli.sh;n/a"
         'VSCodium;codium;https://api.github.com/repos/VSCodium/vscodium/releases/latest;jq -r ".assets[].browser_download_url" | grep -i "vscodium\-linux\-x64.*tar.gz$"'
         "XnView;xnview;https://download.xnview.com/XnView_MP.glibc2.17-x86_64.AppImage;n/a"
         "Xournal++;xournalpp;https://api.github.com/repos/xournalpp/xournalpp/releases/latest;$jqcmd"
@@ -2004,8 +2644,7 @@ set_portables() {
     # Append the Portables directory to ~/.profile
     if touch "$_USERPROFILE"; then
         if ! grep -q "Portables" <"$_USERPROFILE"; then
-            printf "\n%s\n" "export PATH=\$PATH:$_APPSDIR" >>"$_USERPROFILE"
-            # shellcheck source=/dev/null
+            printf "\n%s\n" "export PATH=\"$_APPSDIR:\$PATH\"" >>"$_USERPROFILE"
             source "$_USERPROFILE"
             log_message "$_APPSDIR added to \$PATH" 1
         else
@@ -2016,437 +2655,41 @@ set_portables() {
     fi
 }
 
-set_repos() {
-    # Description:  Downloads and installs packages that require installation (e.g., .DEB files).
-    # Arguments:    None.
-    log_message "Initialising installation of additional programs ..." 5
-    local CFLAGS LDFLAGS PKG_CONFIG_PATH amr amr_DIR debfile direx file filename gsm gsm_DIR
-    local lame lame_DIR libex opus opus_DIR package perc speex speex_DIR temp_dir title url version
-
-    # Check if the global array variable is not empty
-    if [ "${#_INSTALLERS[@]}" -eq 0 ]; then
-        log_message "Nothing to install. Skipping ..." 3
-        return 1
-    fi
-
-    stop_packagekitd
-    temp_dir=$(mktemp -d)
-    for title in "${_INSTALLERS[@]}"; do
-        package="${title,,}" # convert to lowercase
-        log_message "[+] Installing $title ..." 5
-        case "$package" in
-        calibre)
-            if ! which "$package" >/dev/null 2>&1; then
-                set_dependency "libxcb-cursor0"
-                url='https://download.calibre-ebook.com/linux-installer.sh'
-                filename=$(basename "$url")
-                fetch_file "$url" "$filename" "$temp_dir"
-                chmod +x "$temp_dir"/linux-installer.sh
-                echo
-                sudo sh "$temp_dir"/linux-installer.sh 2>&1 | log_trace "[PPA]"
-                [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "$title installation complete" 1
-                rm "$temp_dir"/linux-installer.sh >/dev/null 2>&1 | log_trace "[PPA]"
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-            ;;
-        dconf-editor)
-            if ! which "$package" >/dev/null 2>&1; then
-                sudo apt-get install "$package" 2>&1 | log_trace "[PPA]"
-                [ "${PIPESTATUS[0]}" -eq 0 ] && log_message "$title installation complete" 1
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-            ;;
-        ffmpeg_s)
-            # shellcheck disable=2034,2154
-            if ! which "$package" >/dev/null 2>&1; then
-                cd "$temp_dir" || return 4
-
-                # Install dependencies
-                url='https://bootstrap.pypa.io/get-pip.py'
-                filename=$(basename $url)
-                log_message "[+] Installing $title dependencies ..." 5
-                if fetch_file "$url" "$filename" "."; then
-                    python3 get-pip.py | log_trace "[PPA]" && pip3 install -U meson ninja cmake | log_trace "[PPA]"
-                else
-                    set_dependency meson ninja-build cmake | log_trace "[PPA]"
-                fi
-
-                set_dependency autoconf \
-                    automake \
-                    build-essential \
-                    checkinstall \
-                    git-core \
-                    libass-dev \
-                    libfreetype6-dev \
-                    libgnutls28-dev \
-                    libmp3lame-dev \
-                    libsdl2-dev \
-                    libtool \
-                    libunistring-dev \
-                    libva-dev \
-                    libvdpau-dev \
-                    libvorbis-dev \
-                    libxcb1-dev \
-                    libxcb-shm0-dev \
-                    libxcb-xfixes0-dev \
-                    nasm \
-                    pkg-config \
-                    texinfo \
-                    wget \
-                    yasm \
-                    zlib1g-dev | log_trace "[PPA]"
-
-                # Download extra libraries and set prerequisites
-                log_message "[+] Processing extra libraries ..." 5
-                mkdir -p "$temp_dir/build"
-                mkdir -p "$temp_dir/build/local/include"
-                mkdir -p "$temp_dir/build/local/lib"
-                mkdir -p "$temp_dir/build/local/lib/pkgconfig"
-                mkdir -p "$temp_dir/Output"
-                export CPPFLAGS="-fPIC"
-                export CFLAGS="-fPIC"
-                export CXXFLAGS="-fPIC"
-                export LDFLAGS="-fPIC"
-                export PATH="$HOME/bin:$PATH"
-                PKG_CONFIG_PATH="$temp_dir/build/local/lib/pkgconfig"
-                export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-
-                gsm='http://www.quut.com/gsm/gsm-1.0.22.tar.gz'
-                speex='http://downloads.us.xiph.org/releases/speex/speex-1.2.1.tar.gz'
-                amr='https://downloads.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-0.1.5.tar.gz'
-                lame='https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz'
-                opus='https://archive.mozilla.org/pub/opus/opus-1.3.1.tar.gz'
-
-                for libex in gsm speex amr lame opus; do
-                    eval url="\$$libex"
-                    filename=$(basename "$url")
-
-                    if [ ! -f "$filename" ]; then
-                        if ! fetch_file "$url" "$filename" "."; then
-                            log_message "Failed to download required library. Please check if URLs are valid" 3
-                            return 20
-                        fi
-                    fi
-
-                    # Extract the libraries
-                    eval direx="$(tar tf "$filename" | sed -e '1s/\/.*//;2,$d')"
-                    [ ! -x "$direx" ] && tar xf "$filename"
-                    eval "${libex}_DIR"="$direx"
-                done
-
-                # Set library GSM
-                if true; then
-                    cd "$gsm_DIR" || return 4
-                    make CCINC="${CFLAGS}" LDINC="${LDFLAGS}" lib/libgsm.a | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "GSM make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    mkdir -p "$temp_dir/build/local/include/gsm"
-                    cp -pR inc/* "$temp_dir/build/local/include/gsm"
-                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib"
-                    cd ..
-                fi
-
-                # Set library Speex
-                if true; then
-                    cd "$speex_DIR" || return 4
-                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Speex configure failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C libspeex | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Speex make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C include | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Speex make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    cp -pR include/* "$temp_dir/build/local/include" 2>&1 | log_trace "[PPA]"
-                    cp -pR speex.pc "$temp_dir/build/local/lib/pkgconfig" 2>&1 | log_trace "[PPA]"
-                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[PPA]"
-                    cd ..
-                fi
-
-                # Set library Lame
-                if true; then
-                    cd "$lame_DIR" || return 4
-                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-frontend | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Lame configure failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C mpglib | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Lame mpglib make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C libmp3lame | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Lame libmp3lame make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    mkdir -p "$temp_dir/build/local/include/lame"
-                    cp -p include/* "$temp_dir/build/local/include/lame" 2>&1 | log_trace "[PPA]"
-                    cp -pR "$(find . -name \*.a)" "$temp_dir/build/local/lib" 2>&1 | log_trace "[PPA]"
-                    cd ..
-                fi
-
-                # Set library Opus
-                if true; then
-                    cd "$opus_DIR" || return 4
-                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking --disable-doc --disable-extra-programs | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Opus configure failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Opus make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    cp -pR opus.pc "$temp_dir/build/local/lib/pkgconfig"
-                    cp -pR include/opus.h include/opus_multistream.h include/opus_types.h include/opus_defines.h include/opus_projection.h "$temp_dir/build/local/include"
-                    cp -pR "$(find .libs -name \*.a)" "$temp_dir/build/local/lib"
-                    cd ..
-                fi
-
-                # Set library Opencore-AMR
-                if true; then
-                    cd "$amr_DIR" || return 4
-                    ./configure --enable-static=yes --enable-shared=no --disable-dependency-tracking | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Opencore-AMR configure failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C amrnb | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Opencore-AMRNB make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -C amrwb | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "Opencore-AMRWB make failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    mkdir -p "$temp_dir/build/local/include/opencore-amrnb"
-                    mkdir -p "$temp_dir/build/local/include/opencore-amrwb"
-                    cp -pR amrnb/*.h "$temp_dir/build/local/include/opencore-amrnb" 2>&1 | log_trace "[PPA]"
-                    cp -pR amrwb/*.h "$temp_dir/build/local/include/opencore-amrwb" 2>&1 | log_trace "[PPA]"
-                    # shellcheck disable=2038
-                    find . -name "*.a" | xargs -I {} cp -pR {} "$temp_dir/build/local/lib" 2>&1 | log_trace "[PPA]"
-                    cd ..
-                fi
-
-                # Download and extract FFMPEG
-                log_message "[+] Processing $title ..." 5
-                url=$(curl -sfL 'https://ffmpeg.org/download.html' | grep -o "http.*.tar.xz")
-                filename=$(basename "$url")
-                fetch_file "$url" "$filename" "."
-
-                if which checkinstall >/dev/null; then
-                    tar_extractor "./$filename" 'nul' "." 2>&1 | log_trace "[PPA]"
-                    version="$(<VERSION)"
-
-                    # Alternative way to determine FFMPEG version
-                    if [ -z "$version" ]; then
-                        version="${filename#*\-}"
-                        version="${version%\.tar*}"
-                    fi
-
-                    # Set FFMPEG configuration parameters
-                    sh ./configure \
-                        --pkg-config-flags="--static" \
-                        --toolchain=hardened \
-                        --arch=x86_64 \
-                        --disable-avdevice \
-                        --disable-debug \
-                        --disable-doc \
-                        --disable-static \
-                        --disable-stripping \
-                        --enable-gnutls \
-                        --enable-gpl \
-                        --enable-libgsm \
-                        --enable-libmp3lame \
-                        --enable-libopencore-amrnb \
-                        --enable-libopencore-amrwb \
-                        --enable-libopus \
-                        --enable-libpulse \
-                        --enable-libspeex \
-                        --enable-nonfree \
-                        --enable-pthreads \
-                        --enable-shared \
-                        --enable-version3 \
-                        --extra-cflags="-I./build/local/include" \
-                        --extra-ldflags="-L./build/local/lib" \
-                        --extra-libs="-lpthread -lm" 2>&1 | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "$title configure failed. Skipping ..." 3
-                        return 16
-                    fi
-
-                    make -j"$(nproc)" 2>&1 | log_trace "[PPA]"
-                    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-                        log_message "$title make failed. Skipping ..."
-                        return 16
-                    fi
-
-                    log_message "[+] Creating a Debian file with checkinstall ..." 5
-                    sudo checkinstall --install=no --pakdir="$HOME"/Downloads --pkgname=FFMPEG --pkgversion="$version" -y 2>&1 | log_trace "[PPA]"
-
-                    # Find the .DEB file created by checkinstall
-                    debfile=$(find "$HOME/Downloads" -maxdepth 1 -type f -iname "*.DEB")
-
-                    # Copy the .DEB file and set user rights
-                    if [ -n "$debfile" ]; then
-                        sudo mv "$debfile" "$HOME/Downloads/ffmpeg-$version.deb" 2>&1 | log_trace "[PPA]" &&
-                            sudo chown "$_USERID":"$_USERNAME" "$HOME/Downloads/ffmpeg-$version.deb" 2>&1 | log_trace "[PPA]" &&
-                            log_message "File renamed to '$HOME/Downloads/ffmpeg-$version.deb'" 1
-                    else
-                        log_message "No .DEB file found at '$HOME/Downloads'" 3
-                    fi
-
-                    if which "$package" >/dev/null 2>&1; then
-                        log_message "$title installation complete" 1
-                    fi
-                else
-                    log_message "Cannot continue $title installation.
-                Please make sure 'yasm', 'checkinstall' installed, and/or archive intact" 3
-                    return 15
-                fi
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-
-            cd ..
-            ;;
-        fsearch)
-            if ! which fsearch >/dev/null 2>&1; then
-                sudo add-apt-repository --yes ppa:christian-boxdoerfer/fsearch-daily 2>&1 | log_trace "[PPA]"
-                sudo apt-get update 2>&1 | log_trace "[PPA]"
-                sudo apt-get install "$package" 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "$title installation complete" 1
-                else
-                    log_message "$title installation failed" 3
-                fi
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-            ;;
-        libreoffice)
-            if ! find /etc/apt/ -name "$package*.list" -print0 | xargs -0 cat | grep -q "^deb https.*ubuntu" 2>&1 | log_trace "[PPA]"; then
-                log_message "[+] Updating $title repository ..."
-                sudo add-apt-repository --yes ppa:"$package"/ppa 2>&1 | log_trace "[PPA]" &&
-                    log_message "$title repository updated" 1
-            else
-                log_message "$title repository is up-to-date. Skipping ..."
-            fi
-
-            libreoffice_extensions
-            ;;
-        lmsensors)
-            if ! which sensors >/dev/null 2>&1; then
-                sudo apt-get install lm-sensors 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "lm-sensors installation complete" 1
-                else
-                    log_message "lm-sensors installation failed" 3
-                fi
-            else
-                log_message "lm-sensors already installed. Skipping ..."
-            fi
-            ;;
-        prftocgen)
-            if ! which pdftocgen >/dev/null 2>&1; then
-                set_dependency python3-pip
-                pip3 install -U pdf.tocgen 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "PDF TOC Generator installation complete" 1
-                else
-                    log_message "PDF TOC Generator installation failed" 3
-                fi
-            else
-                log_message "PDF TOC Generator already installed. Skipping ..."
-            fi
-            ;;
-        teamviewer)
-            if ! which "$package" >/dev/null 2>&1; then
-                url='https://download.teamviewer.com/download/linux/teamviewer_amd64.deb'
-                filename=$(basename "$url")
-                cd "$temp_dir" || return 4
-                fetch_file "$url" "$filename" "."
-                sudo apt-get install "./$filename" -y 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "$title installation complete" 1
-                else
-                    log_message "$title installation failed" 3
-                fi
-
-                cd ..
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-            ;;
-        virt-manager)
-            if ! which "$package" >/dev/null 2>&1; then
-                sudo apt-get install "$package" -y 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "Virtualisation Manager installation complete" 1
-                else
-                    log_message "Virtualisation Manager installation failed" 3
-                fi
-            else
-                log_message "Virtualisation Manager already installed. Skipping ..."
-            fi
-            ;;
-        *)
-            if ! which "$package" >/dev/null 2>&1; then
-                sudo apt-get install "$package" 2>&1 | log_trace "[PPA]"
-                if [ "${PIPESTATUS[0]}" -eq 0 ]; then
-                    log_message "$title installation complete" 1
-                else
-                    log_message "$title installation failed" 3
-                fi
-            else
-                log_message "$title already installed. Skipping ..."
-            fi
-            ;;
-        esac
-    done
-}
-
 system_check() {
     # Desription:   Checks user's operating system for compatibility with the script.
     # Arguments:    None.
+    local bin version
+
     if [[ -r "${_OS_RELEASE}" ]]; then
-        log_message "Found OS release file: ${_OS_RELEASE}"
+        log_message "OS release file: ${_OS_RELEASE}" 1
         _DISTRO_PRETTY_NAME="$(awk '/PRETTY_NAME=/' "${_OS_RELEASE}" | sed 's/PRETTY_NAME=//' | tr -d '"')"
         _NAME="$(awk '/^NAME=/' "${_OS_RELEASE}" | sed 's/^NAME=//' | tr -d '"')"
         _VERSION_CODENAME="$(awk '/VERSION_CODENAME=/' "${_OS_RELEASE}" | sed 's/VERSION_CODENAME=//')"
-        [[ ${_NAME} != "${_OS}" ]] && log_and_exit "Operating system mismatch: ${_NAME}" 17
-        log_message "Operating system: ${_DISTRO_PRETTY_NAME}"
+        [[ ${_NAME} != "${_OS}" ]] && log_and_exit "${FUNCNAME[0]}: Operating system mismatch: ${_NAME}" 17
+        log_message "Operating system: ${_DISTRO_PRETTY_NAME}" 1
     else
-        log_and_exit "Failed to determine operating system!" 21
+        log_and_exit "${FUNCNAME[0]}: Failed to determine operating system!" 21
     fi
+
+    # Check Bash version
+    if [ "${BASH_VERSINFO[0]}" -lt 5 ]; then
+        log_and_exit "${FUNCNAME[0]}: Incompatible Bash version: ${BASH_VERSION}" 21
+    else
+        log_message "Bash version: ${BASH_VERSION%%\(*}" 1
+    fi
+
+    # Check other packages
+    for bin in curl jq jsonschema; do
+        if [ "$bin" == 'curl' ]; then
+            command -v "$bin" >/dev/null && version=$("$bin" -V | cut -d' ' -f2 | head -1)
+        elif [ "$bin" == 'jq' ]; then
+            command -v "$bin" >/dev/null && version=$("$bin" -V | cut -d- -f2)
+        else
+            version=$(pip3 show "$bin" | grep -oE "^Version:.*" | cut -d' ' -f2-)
+        fi
+
+        log_message "Using '$bin' version: $version" 1
+    done
 
     readonly _DISTRO_PRETTY_NAME _NAME _VERSION_CODENAME
 }
@@ -2456,8 +2699,6 @@ stop_packagekitd() {
     #               and returns error 'E: Could not get lock /var/lib/apt/lists/lock. It is held by process {PROCID} (packagekitd)'.
     #               Restarting the daemon is unnecessary, as this will be done by `apt` anyway.
     # Arguments:    None.
-    # References:   https://unix.stackexchange.com/a/522362
-    #               https://askubuntu.com/questions/15433
 
     # Check if PackageKit service is running
     if systemctl is-active --quiet packagekit.service; then
@@ -2485,7 +2726,6 @@ system_update() {
         if [ -f "$_MISC"/poppi.desktop ]; then
             if mkdir -p "$HOME"/.config/autostart 2>&1 | log_trace "[APT]"; then
                 printf "%s\n" "Exec=gnome-terminal -e \"bash -c '$_BASEDIR/$_SCRIPT $_OPTION $_CONFIG_FILE; exec bash'\"" >>"$_MISC"/poppi.desktop
-
                 # autostart POPPI on system reboot
                 cp "$_MISC"/poppi.desktop "$HOME"/.config/autostart 2>&1 | log_trace "[APT]" && chmod +x "$HOME"/.config/autostart/poppi.desktop && restart
             fi
@@ -2539,7 +2779,7 @@ tar_extractor() {
     done
 
     if [[ $isArchive = 'false' ]]; then
-        log_message "ERR: ${FUNCNAME[0]} \${1} not a valid archive: $appfile" 2
+        log_message "${FUNCNAME[0]}: Not a valid archive: $appfile" 2
         return 22
     fi
 
@@ -2547,7 +2787,7 @@ tar_extractor() {
     # convert to a valid one, if necessary, then
     # replace with the default one, if missing
     if [[ ! "${2}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-        log_message "WRN: ${FUNCNAME[0]} \${2} not a valid file/directory name: ${2}" 3
+        log_message "${FUNCNAME[0]}: Not a valid file/directory name: ${2}" 3
         # shellcheck disable=SC2001
         appname=$(echo "${2}" | sed 's/[^a-zA-Z0-9._-]/_/g')
     fi
@@ -2556,13 +2796,12 @@ tar_extractor() {
 
     # Check if the 3rd argument is a valid directory
     if [ ! -d "${3}" ]; then
-        log_message "WRN: ${FUNCNAME[0]} \${2} not a valid directory: ${3}" 3
+        log_message "${FUNCNAME[0]}: Not a valid directory: ${3}" 3
     fi
 
     loc="${3:-$_BASEDIR}"
     fmt=$(file "$appfile" | awk '{print $2}')                   # determine archive's format
     declare -a tars=('gzip;tzf;xzf' 'XZ;tf;xf' 'bzip2;tjf;xjf') # create an array with tarball commands for specific archive formats
-
     for tar in "${tars[@]}"; do
         zip="${tar%%;*}"                   # compression format
         lst="${tar#*;}" && lst="${lst%;*}" # listing method
@@ -2661,21 +2900,44 @@ user_consent() {
     done
 }
 
-# shellcheck disable=SC2190
 validate_json() {
-    local json_file json_keys
+    # Description:  Validates user configurations provided as JSON data.
+    # Arguments:    None.
+    local errMsg
 
-    if [ $# -ne 1 ]; then
-        log_and_exit "ERR: Wrong number of arguments for '${FUNCTION[0]}'." 3
-    fi
+    set_dependency python3
+    if [ -f "$_CONFIG_FILE" ] && [ -f "$_SCHEMA" ]; then
+        errMsg=$(
+            python3 <<EOF 2>&1 | log_trace "[JVL]"
+import json
+import sys
+from jsonschema import validate, ValidationError
 
-    json_file="$1"
-    declare -a json_keys=(GENERAL GENERAL.\"gen.colour_head\" GENERAL.\"gen.colour_info\" GENERAL.\"gen.colour_okay\" GENERAL.\"gen.colour_stop\" GENERAL.\"gen.colour_warn\" GENERAL.\"gen.logfile_backup_no\" GENERAL.\"gen.logfile_format\" GENERAL.\"gen.logfile_on\" GENERAL.\"gen.maximise_window\" GENERAL.\"gen.set_timer\" GENERAL.\"gen.test_server\" FIREFOX FIREFOX.\"ffx.configure\" FIREFOX.\"ffx.cookies_to_keep\" FIREFOX.\"ffx.extensions\" FIREFOX.\"ffx.profile\" FIREFOX.\"ffx.set_homepage\" FIREFOX.\"ffx.set_privacy\" PACKAGES PACKAGES.\"pkg.autostart\" PACKAGES.\"pkg.installers\" PACKAGES.\"pkg.installers\".Calibre PACKAGES.\"pkg.installers\".Calibre.required PACKAGES.\"pkg.installers\".\"DConf-Editor\" PACKAGES.\"pkg.installers\".\"DConf-Editor\".required PACKAGES.\"pkg.installers\".FFMPEG_s PACKAGES.\"pkg.installers\".FFMPEG_s.required PACKAGES.\"pkg.installers\".FSearch PACKAGES.\"pkg.installers\".FSearch.required PACKAGES.\"pkg.installers\".LibreOffice PACKAGES.\"pkg.installers\".LibreOffice.required PACKAGES.\"pkg.installers\".LibreOffice.extensions PACKAGES.\"pkg.installers\".lmsensors PACKAGES.\"pkg.installers\".lmsensors.required PACKAGES.\"pkg.installers\".pdftocgen PACKAGES.\"pkg.installers\".pdftocgen.required PACKAGES.\"pkg.installers\".TeamViewer PACKAGES.\"pkg.installers\".TeamViewer.required PACKAGES.\"pkg.installers\".\"Virt-Manager\" PACKAGES.\"pkg.installers\".\"Virt-Manager\".required PACKAGES.\"pkg.portables\" PACKAGES.\"pkg.portables\".audacity PACKAGES.\"pkg.portables\".audacity.required PACKAGES.\"pkg.portables\".bleachbit PACKAGES.\"pkg.portables\".bleachbit.required PACKAGES.\"pkg.portables\".cpux PACKAGES.\"pkg.portables\".cpux.required PACKAGES.\"pkg.portables\".curl PACKAGES.\"pkg.portables\".curl.required PACKAGES.\"pkg.portables\".deadbeef PACKAGES.\"pkg.portables\".deadbeef.required PACKAGES.\"pkg.portables\".hwprobe PACKAGES.\"pkg.portables\".hwprobe.required PACKAGES.\"pkg.portables\".imagemagick PACKAGES.\"pkg.portables\".imagemagick.required PACKAGES.\"pkg.portables\".inkscape PACKAGES.\"pkg.portables\".inkscape.required PACKAGES.\"pkg.portables\".jq PACKAGES.\"pkg.portables\".jq.required PACKAGES.\"pkg.portables\".keepassxc PACKAGES.\"pkg.portables\".keepassxc.required PACKAGES.\"pkg.portables\".krita PACKAGES.\"pkg.portables\".krita.required PACKAGES.\"pkg.portables\".musescore PACKAGES.\"pkg.portables\".musescore.required PACKAGES.\"pkg.portables\".neofetch PACKAGES.\"pkg.portables\".neofetch.required PACKAGES.\"pkg.portables\".qbittorrent PACKAGES.\"pkg.portables\".qbittorrent.required PACKAGES.\"pkg.portables\".smplayer PACKAGES.\"pkg.portables\".smplayer.required PACKAGES.\"pkg.portables\".sqlitebrowser PACKAGES.\"pkg.portables\".sqlitebrowser.required PACKAGES.\"pkg.portables\".stylish PACKAGES.\"pkg.portables\".stylish.required PACKAGES.\"pkg.portables\".codium PACKAGES.\"pkg.portables\".codium.required PACKAGES.\"pkg.portables\".codium.extensions PACKAGES.\"pkg.portables\".codium.settings PACKAGES.\"pkg.portables\".codium.settings.nameShort PACKAGES.\"pkg.portables\".codium.settings.nameLong PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.serviceUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.cacheUrl PACKAGES.\"pkg.portables\".codium.settings.extensionsGallery.itemUrl PACKAGES.\"pkg.portables\".xnview PACKAGES.\"pkg.portables\".xnview.required PACKAGES.\"pkg.portables\".xournalpp PACKAGES.\"pkg.portables\".xournalpp.required PACKAGES.\"pkg.portables\".ytdlp PACKAGES.\"pkg.portables\".ytdlp.required PACKAGES.\"pkg.portables_dir\" MISCOPS MISCOPS.\"msc.automount_drives\" MISCOPS.\"msc.avatar_enable\" MISCOPS.\"msc.avatar_image\" MISCOPS.\"msc.bookmarked_dirs\" MISCOPS.\"msc.crontab_cmds\" MISCOPS.\"msc.gnome_calc_functions\" MISCOPS.\"msc.gnome_extensions\" MISCOPS.\"msc.gnome_extension_settings\" MISCOPS.\"msc.gnome_favourites\" MISCOPS.\"msc.gnome_settings\" MISCOPS.\"msc.ms_fonts\" MISCOPS.\"msc.set_geary\" MISCOPS.\"msc.volume_overamplify\" MISCOPS.\"msc.wallpaper_on\" MISCOPS.\"msc.wallpaper_src_dir\" MISCOPS.\"msc.wallpaper_ext_dir\" MISCOPS.\"msc.week_starts_on_monday\")
-    for key in "${json_keys[@]}"; do
-        if ! jq -e ".${key} // empty" "$json_file" >/dev/null; then
-            log_and_exit "Not a valid configuration file. Exiting ..." 23
+# Load the schema and the data
+with open('$_SCHEMA') as schema_file:
+    schema = json.load(schema_file)
+
+with open('$_CONFIG_FILE') as data_file:
+    data = json.load(data_file)
+
+# Validate data against the schema
+try:
+    validate(instance=data, schema=schema)
+except ValidationError as e:
+    print(e.message)  # This will be captured as an error message
+    sys.exit(1)
+EOF
+        )
+
+        # Check the exit status of the Python command
+        if [ -n "$errMsg" ]; then
+            echo "$errMsg" | log_trace "[JVL]"
+            log_and_exit "${FUNCNAME[0]}: JSON validation failed. A new configuration file created.
+    Please make necessary changes to it and re-run the script." 23
         fi
-    done
+    else
+        log_and_exit "${FUNCNAME[0]}: Necessary file(s) missing." 24
+    fi
 
     return 0
 }
@@ -2683,7 +2945,7 @@ validate_json() {
 vsc_extensions() {
     # Description:  Downloads and sets up VS Codium extensions.
     # Arguments:    None.
-    local codium_dir extensions_dir
+    local codium_dir extension extensions_dir
 
     if [ ! -d "$_APPSDIR"/codium ]; then
         log_message "VS Codium is not available. Skipping ..." 3 && return 12
@@ -2770,22 +3032,9 @@ vsc_patcher() {
     fi
 }
 
-all() {
-    # Description:  Executes all the script operations in sequence.
-    # Arguments:    None.
-    # Note:         The order of functions DOES matter.
-    set_portables
-    set_repos
-    set_firefox
-    miscops
-    set_configs
-    set_gsettings
-    set_gnome_extensions
-    misc_change_avatar
-    set_favourites
-}
-
 main() {
+    local arg dep f
+
     # Load default settings
     __init_vars
 
@@ -2817,7 +3066,7 @@ main() {
         return 3
     fi
 
-    # Validate the user configuration file or make a new one if there's none
+    # Validate the user configuration file or make a new one, if there's none
     if ! [ -f "$_CONFIG_FILE" ] && [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
         __make_configs
         _CONFIG_FILE="$_BASEDIR"/configure.pop # Assign default configuration file
@@ -2825,11 +3074,16 @@ main() {
 
     # Validate and load configs if the option is not one of the specified characters or words
     if [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
-        validate_json "$_CONFIG_FILE"
-        __load_configs
-    fi
+        for dep in curl jq jsonschema; do
+            if [ ! -f "$_BINPATH/$dep" ]; then
+                set_dependency "$dep"
+            fi
+        done
 
-    __make_dirs # Create default script directories
+        validate_json
+        __load_configs
+        __make_dirs
+    fi
 
     # Process the arguments
     case "$_OPTION" in
@@ -2857,14 +3111,14 @@ main() {
         set_gsettings
         ;;
     -h | --help) display_usage ;;
+    -i | --set-installers)
+        online
+        set_installers
+        set_configs
+        ;;
     -p | --set-portables)
         online
         set_portables
-        set_configs
-        ;;
-    -r | --set-repos)
-        online
-        set_repos
         set_configs
         ;;
     -v | --version) display_version ;;
@@ -2876,14 +3130,23 @@ main() {
     esac
 
     if [ "$_ENDMSG" = 'true' ]; then
-        _ENDMSG='false'
         system_update
         screenlock
-        echo
+        # Remove unnecessary binaries and/or setup files
+        for f in curl jq; do
+            [ -f "$_BINPATH/$f" ] && rm "$_BINPATH/$f" 2>&1 | log_trace "[000]"
+        done
+
         finale
         restart
     fi
 
+    # Remove unnecessary binaries and/or setup files
+    for f in curl jq; do
+        [ -f "$_BINPATH/$f" ] && rm "$_BINPATH/$f" 2>&1 | log_trace "[000]"
+    done
+
+    # ... and ends here.
     if [[ ! "$_OPTION" =~ ^(-[chv]|--(connect|help|version))$ ]]; then
         finale
     fi
