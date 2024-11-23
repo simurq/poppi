@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "empty_or_colour": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:#([0-9A-Fa-f]{3}){1,2}|rgb\\(\\s*(?:(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)\\s*,\\s*){2}(?:25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)\\s*\\))$"
+        }
+      ]
+    },
+    "empty_or_path": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^/.*$"
+        }
+      ]
+    },
+    "empty_or_server": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\\.[A-Za-z]{2,})+$"
+        }
+      ]
+    },
+    "empty_or_toggle": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 0
+        },
+        {
+          "type": "string",
+          "pattern": "^[01]$"
+        },
+        {
+          "type": "integer",
+          "enum": [
+            0,
+            1
+          ]
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "GENERAL": {
+      "type": "object",
+      "properties": {
+        "gen.colour_head": {
+          "$ref": "#/$defs/empty_or_colour"
+        },
+        "gen.colour_info": {
+          "$ref": "#/$defs/empty_or_colour"
+        },
+        "gen.colour_okay": {
+          "$ref": "#/$defs/empty_or_colour"
+        },
+        "gen.colour_stop": {
+          "$ref": "#/$defs/empty_or_colour"
+        },
+        "gen.colour_warn": {
+          "$ref": "#/$defs/empty_or_colour"
+        },
+        "gen.logfile_backup_no": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]?)$"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 99
+            }
+          ]
+        },
+        "gen.logfile_format": {
+          "type": "string",
+          "pattern": "^(US|Metric)$"
+        },
+        "gen.logfile_on": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "gen.maximise_window": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "gen.set_timer": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "gen.test_server": {
+          "type": "string",
+          "pattern": "^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\\.[A-Za-z]{2,})+$"
+        }
+      }
+    },
+    "FIREFOX": {
+      "type": "object",
+      "properties": {
+        "ffx.configure": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "ffx.cookies_to_keep": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "ffx.extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ffx.profile": {
+          "type": "string"
+        },
+        "ffx.set_homepage": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "ffx.set_privacy": {
+          "$ref": "#/$defs/empty_or_toggle"
+        }
+      }
+    },
+    "PACKAGES": {
+      "type": "object",
+      "properties": {
+        "pkg.autostart": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pkg.installers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "$ref": "#/$defs/empty_or_toggle"
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "required"
+            ]
+          }
+        },
+        "pkg.portables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "required": {
+                "$ref": "#/$defs/empty_or_toggle"
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "required"
+            ]
+          }
+        },
+        "pkg.portables_dir": {
+          "$ref": "#/$defs/empty_or_path"
+        }
+      }
+    },
+    "MISCOPS": {
+      "type": "object",
+      "properties": {
+        "msc.automount_drives": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.avatar_enable": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "msc.avatar_image": {
+          "type": "string"
+        },
+        "msc.bookmarked_dirs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/.*"
+          }
+        },
+        "msc.crontab_cmds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_calc_functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_custom_settings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_extension_settings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_favourites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msc.gnome_settings": {
+          "type": "object",
+          "required": [
+            "keyboard_languages",
+            "button_layout",
+            "button_position",
+            "capslock_as_extra_escape",
+            "centre_windows_on_open",
+            "check_alive_timeout",
+            "compose_key",
+            "font_scaling_factor",
+            "font_terminal",
+            "font_ui",
+            "launch_browser",
+            "launch_files",
+            "launch_settings",
+            "launch_terminal",
+            "set_wallpaper",
+            "show_seconds",
+            "show_weekdays",
+            "switch_workspace_down",
+            "switch_workspace_up",
+            "windows_close",
+            "windows_maximise",
+            "windows_minimise"
+          ],
+          "properties": {
+            "keyboard_languages": {
+              "type": "string"
+            },
+            "button_layout": {
+              "type": "string"
+            },
+            "button_position": {
+              "type": "string"
+            },
+            "capslock_as_extra_escape": {
+              "$ref": "#/$defs/empty_or_toggle"
+            },
+            "centre_windows_on_open": {
+              "$ref": "#/$defs/empty_or_toggle"
+            },
+            "check_alive_timeout": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(10000|[1-9][0-9]{0,4}|0)$"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              ]
+            },
+            "compose_key": {
+              "type": "string"
+            },
+            "font_scaling_factor": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+$"
+            },
+            "font_terminal": {
+              "type": "string"
+            },
+            "font_ui": {
+              "type": "string"
+            },
+            "launch_browser": {
+              "type": "string"
+            },
+            "launch_files": {
+              "type": "string"
+            },
+            "launch_settings": {
+              "type": "string"
+            },
+            "launch_terminal": {
+              "type": "string"
+            },
+            "set_wallpaper": {
+              "$ref": "#/$defs/empty_or_path"
+            },
+            "show_seconds": {
+              "$ref": "#/$defs/empty_or_toggle"
+            },
+            "show_weekdays": {
+              "$ref": "#/$defs/empty_or_toggle"
+            },
+            "switch_workspace_down": {
+              "type": "string"
+            },
+            "switch_workspace_up": {
+              "type": "string"
+            },
+            "windows_close": {
+              "type": "string"
+            },
+            "windows_maximise": {
+              "type": "string"
+            },
+            "windows_minimise": {
+              "type": "string"
+            }
+          }
+        },
+        "msc.ms_fonts": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "msc.set_geary": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "msc.volume_overamplify": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "msc.wallpaper_on": {
+          "$ref": "#/$defs/empty_or_toggle"
+        },
+        "msc.wallpaper_src_dir": {
+          "$ref": "#/$defs/empty_or_path"
+        },
+        "msc.wallpaper_ext_dir": {
+          "$ref": "#/$defs/empty_or_path"
+        },
+        "msc.week_starts_on_monday": {
+          "$ref": "#/$defs/empty_or_toggle"
+        }
+      }
+    }
+  }
+}
