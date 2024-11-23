@@ -62,7 +62,7 @@ chmod +x ./poppi.sh
 
 The JSON configuration file `configure.pop` is a key component of POPPI. It is where you'll spend most of your time, adjusting POPPI's workflow to your individual needs. The script will read all the user settings from this file. You're strongly encouraged to modify the configuration file instead of making direct edits to the script.
 
-By default, a new configuration file will be created in the same directory where you run the script, if one is not found there. You can then make necessary changes to the file. Both files—`configure.pop` and `poppi.sh`—should be in the same directory to make POPPI run properly. A detailed explanation of the JSON key/value pairs found in `configure.pop` is provided below.
+By default, a new configuration file will be created in the same directory where you run the script, if one is not already there. You can then make necessary changes to the file. Both files—`configure.pop` and `poppi.sh`—should be in the same directory to make POPPI run properly. A detailed explanation of the JSON key/value pairs found in `configure.pop` is provided below.
 
 
 #### Section `GENERAL`
@@ -148,7 +148,7 @@ This section specifies general settings pertinent to the script itself.
 <td>
 
 ```json
-"gen.logfile_on": "1"
+"gen.logfile_on": 1
 ```
 
 </td>
@@ -158,7 +158,7 @@ This section specifies general settings pertinent to the script itself.
 <td>
 
 ```json
-"gen.maximise_window": "1"
+"gen.maximise_window": 1
 ```
 
 </td>
@@ -168,7 +168,7 @@ This section specifies general settings pertinent to the script itself.
 <td>
 
 ```json
-"gen.set_timer": "1"
+"gen.set_timer": 1
 ```
 
 </td>
@@ -192,7 +192,7 @@ This section specifies general settings pertinent to the script itself.
 #### Section `FIREFOX`
 
 This section covers all the operations with the Firefox browser, including:
-* the creation of user profile;
+* the creation or identification of user profile;
 * the download and installation of browser extensions;
 * setting user's privacy environment (Arkenfox stuff reinforced with personal [user overrides](https://github.com/arkenfox/user.js/wiki));
 * setting the persistent cookies.
@@ -206,21 +206,11 @@ This section covers all the operations with the Firefox browser, including:
 <td>
 
 ```json
-"ffx.configure": "1"
+"ffx.configure": 1
 ```
 
 </td>
 <td>toggle to enable (1)/disable (default=<b>0</b>) browser configuration. When disabled, POPPI will skip the browser configuration completely.</td>
-</tr>
-<tr>
-<td>
-
-```json
-"ffx.profile": "john-dow"
-```
-
-</td>
-<td>sets a custom name for the browser profile (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
@@ -264,7 +254,7 @@ This section covers all the operations with the Firefox browser, including:
 <td>
 
 ```json
-"ffx.set_privacy": "1"
+"ffx.set_privacy": 1
 ```
 
 </td>
@@ -274,7 +264,7 @@ This section covers all the operations with the Firefox browser, including:
 <td>
 
 ```json
-"ffx.set_homepage": "0"
+"ffx.set_homepage": 0
 ```
 
 </td>
@@ -297,16 +287,6 @@ This section provides a number of options for setting and configuring portable a
 <td>
 
 ```json
-"pkg.portables_dir": "/path/to/directory/Portables"
-```
-
-</td>
-<td>sets the directory to download and install portable packages. While currently only AppImages and archive files are supported, this feature is planned to be extended to allow for other types of portables (default=<b>nul</b>).</td>
-</tr>
-<tr>
-<td>
-
-```json
 "pkg.autostart": [
   "keepassxc"
     ]
@@ -319,72 +299,75 @@ This section provides a number of options for setting and configuring portable a
 <td>
 
 ```json
+"pkg.installers": {
+  "Calibre": {
+    "required": 1
+  },
+  "DConf-Editor": {
+    "required": 1
+  },
+  "FFMPEG": {
+    "required": 1
+  },
+  "LibreOffice": {
+    "required": 1,
+    "extensions": [
+      "theme-sifr",
+      "russian-dictionary-pack",
+      "5814"
+    ],
+  },
+  "pdftocgen": {
+    "required": 1
+  },
+  "TeamViewer": {
+    "required": 1
+  },
+  "Virt-Manager": {
+    "required": 1
+  }
+}
+```
+
+</td>
+<td>specifies installable package(s) to download and install. Each package* can have individual sub-sections, e.g., <code>"extensions"</code> for LibreOffice above.The package will be downloaded and installed, if <code>"required": 1</code>. Otherwise, the download and install for that package will be skipped.</td>
+</tr>
+<tr>
+<td>
+
+```json
 "pkg.portables": {
   "audacity": {
-    "required": "1"
+    "required": 1
   },
   "bleachbit": {
-    "required": "0"
+    "required": 0
   },
   "codium": {
-    "required": "1",
+    "required": 1,
     "extensions": [
       "arcticicestudio.nord-visual-studio-code",
       "basdp.language-gas-x86",
       "ms-vscode.cpptools",
       "equinusocio.vsc-material-theme"
       "vscodevim.vim"
-    ],
-    "settings": {
-      "nameShort": "Visual Studio Code",
-      "nameLong": "Visual Studio Code",
-      "extensionsGallery": {
-        "serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
-        "cacheUrl": "https://vscode.blob.core.windows.net/gallery/index",
-        "itemUrl": "https://marketplace.visualstudio.com/items"
-      }
-    }
+    ]
   }
  }
 ```
 
 </td>
-<td>specifies portable package(s) to download (and extract, if necessary). Each package* can have individual sub-sections, such as <code>"extensions"</code> or <code>"settings"</code> for VS Codium in the above example. The package will be downloaded, if <code>"required": "1"</code>. Otherwise, the download for that package will be skipped.</td>
+<td>specifies portable package(s) to download (and extract, if necessary). Each package* can have individual sub-sections, such as <code>"extensions"</code> or <code>"settings"</code> for VS Codium in the above example. The package will be downloaded, if <code>"required": 1</code>. Otherwise, the download for that package will be skipped.</td>
 </tr>
 <tr>
 <td>
 
 ```json
-"pkg.installers": {
-  "Calibre": {
-    "required": "1"
-  },
-  "DConf-Editor": {
-    "required": "1"
-  },
-  "FFMPEG": {
-    "required": "1"
-  },
-  "LibreOffice": {
-    "required": "1",
-    "extensions": [
-      "theme-sifr"
-      ],
-  },
-  "pdftocgen": {
-    "required": "1"
-  },
-  "TeamViewer": {
-    "required": "1"
-  },
-  "Virt-Manager": {
-    "required": "1"
-  }
-}
+"pkg.portables_dir": "/path/to/directory/Portables"
 ```
 
 </td>
-<td>specifies installable package(s) to download and install. Each package* can have individual sub-sections, e.g., <code>"extensions"</code> for LibreOffice above.The package will be downloaded and installed, if <code>"required": "1"</code>. Otherwise, the download and install for that package will be skipped.</td>
+<td>sets the directory to download and install portable packages. While currently only AppImages and archive files are supported, this feature is planned to be extended to allow for other types of portables (default=<b>nul</b>).</td>
 </tr>
 </table>
 
@@ -394,7 +377,7 @@ This section provides a number of options for setting and configuring portable a
 
 #### Section `MISCOPS`
 
-This section specifies miscellaneous operations. Currently, it covers only those provided below, but can be extended further upon user request.
+This section specifies miscellaneous operations. Currently, it covers only those provided below, but can be extended further also upon user request.
 
 <table>
 <tr>
@@ -412,21 +395,7 @@ This section specifies miscellaneous operations. Currently, it covers only those
 ```
 
 </td>
-<td>sets the external drives provided as a comma-separated array of drive labels to automount on each system reboot, if the drives are mounted. In a nutshell, the script attempts to add the drives to <code>/etc/fstab</code> (default=<b>nul</b>).</td>
-</tr>
-<tr>
-<td>
-
-```json
-"msc.bookmarked_dirs": [
-  "/mnt/DriveLabel01/My-Docs",
-  "/home/<username>/My-Books",
-  "/home/<username>/My-Projects"
-]
-```
-
-</td>
-<td>bookmarks the selected paths provided as a comma-separated array of paths to directories to GNOME Files/Nautilus for easy access (default=<b>nul</b>).</td>
+<td>sets the external drive(s) provided as a comma-separated array of drive labels to automount on each system reboot, if the drives are mounted. Technically, the script will attempt to add the mounted drives to the system file <code>/etc/fstab</code> (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
@@ -446,7 +415,21 @@ This section specifies miscellaneous operations. Currently, it covers only those
 ```
 
 </td>
-<td>sets an image file for the user avatar, if <code>"msc.avatar_enable": 1</code>. Requires a JPEG or PNG image not greater than 512x512 pixels in size dropped into <code>./data/misc</code> (see: <code>3. Prepare your files</code>) (default=<b>"popos.png"</b>).</td>
+<td>sets an image file for the user avatar, if <code>"msc.avatar_enable": 1</code>. Requires a JPEG or PNG image not greater than 512x512 pixels to be in <code>./data/misc</code> (see: <code>3. Prepare your files</code>) (default=<b>"popos.png"</b>).</td>
+</tr>
+<tr>
+<td>
+
+```json
+"msc.bookmarked_dirs": [
+  "/mnt/DriveLabel01/My-Docs",
+  "/home/<username>/My-Books",
+  "/home/<username>/My-Projects"
+]
+```
+
+</td>
+<td>bookmarks the selected directories provided as a comma-separated array of GNOME Files/Nautilus paths for easy access (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
@@ -465,26 +448,6 @@ This section specifies miscellaneous operations. Currently, it covers only those
 <td>
 
 ```json
-"msc.gnome_favourites": [
-  "audacity",
-  "codium",
-  "deadbeef",
-  "firefox",
-  "gnome-control-center",
-  "gnome-terminal",
-  "libreoffice writer",
-  "nautilus",
-  "repoman"
-]
-```
-
-</td>
-<td>pins user's favourite packages provided as a comma-separated array of package names (as found under <code>"pkg.portables"</code> or <code>"pkg.installers"</code>) to dock (default=<b>nul</b>).</td>
-</tr>
-<tr>
-<td>
-
-```json
 "msc.gnome_calc_functions": [
   "ratio(d;D)=(d÷2)^2÷(D÷2)^2@"
 ]
@@ -492,6 +455,28 @@ This section specifies miscellaneous operations. Currently, it covers only those
 
 </td>
 <td>appends custom user functions provided as a comma-separated array of functions to GNOME Calc (default=<b>nul</b>).</td>
+</tr>
+<tr>
+<td>
+
+```json
+"msc.gnome_custom_settings": [
+  "org.gnome.calculator button-mode 'advanced'",
+  "org.gnome.calculator show-thousands true",
+  "org.gnome.desktop.input-sources per-window true",
+  "org.gnome.desktop.interface clock-format '24h'",
+  "org.gnome.desktop.interface font-antialiasing 'rgba'",
+  "org.gnome.desktop.privacy old-files-age uint32 7",
+  "org.gnome.desktop.privacy recent-files-max-age 30",
+  "org.gnome.desktop.privacy remove-old-temp-files true",
+  "org.gnome.desktop.privacy remove-old-trash-files true",
+  "org.gnome.desktop.screensaver lock-enabled false",
+  "org.gnome.desktop.session idle-delay uint32 0"
+]
+```
+
+</td>
+<td>sets custom GNOME GSettings not specified under <code>msc.gnome_settings</code> and provided as a comma-separated array of individual settings. The relevant key/value pairs can be obtained using tools like GNOME's native <a href="https://help.gnome.org/admin/system-admin-guide/stable/gsettings-browse.html.en">GSettings</a> or <a href="https://apps.gnome.org/DconfEditor/">DConf-Editor</a>. Please note the use of escaped characters (e.g., <code>\"</code>) (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
@@ -531,52 +516,60 @@ This section specifies miscellaneous operations. Currently, it covers only those
 <td>
 
 ```json
-"msc.gnome_settings": [
-  "org.gnome.calculator button-mode 'advanced'",
-  "org.gnome.calculator show-thousands true",
-  "org.gnome.desktop.input-sources per-window true",
-    "org.gnome.desktop.interface clock-format '24h'",
-  "org.gnome.desktop.interface clock-show-seconds true",
-  "org.gnome.desktop.interface clock-show-weekday true",
-  "org.gnome.desktop.interface font-antialiasing 'rgba'",
-  "org.gnome.desktop.privacy old-files-age uint32 7",
-  "org.gnome.desktop.privacy recent-files-max-age 30",
-  "org.gnome.desktop.privacy remove-old-temp-files true",
-  "org.gnome.desktop.privacy remove-old-trash-files true",
-  "org.gnome.desktop.screensaver lock-enabled false",
-  "org.gnome.desktop.sound allow-volume-above-100-percent false",
-  "org.gnome.desktop.wm.keybindings minimize ['<Super>z']",
-  "org.gnome.desktop.wm.keybindings show-desktop ['<Super>d']",
-  "org.gnome.desktop.wm.preferences button-layout 'appmenu:close'",
-  "org.gnome.gedit.preferences.editor insert-spaces true",
-  "org.gnome.gedit.preferences.editor tabs-size uint32 4",
-  "org.gnome.GWeather temperature-unit 'centigrade'",
-  "org.gnome.mutter center-new-windows 'true'",
-  "org.gnome.nautilus.preferences default-folder-viewer 'list-view'",
-  "org.gnome.nautilus.list-view default-zoom-level 'small'",
-  "org.gnome.settings-daemon.plugins.color night-light-enabled true",
-  "org.gnome.settings-daemon.plugins.media-keys home @as []",
-  "org.gnome.shell.extensions.dash-to-dock dash-max-icon-size 25",
-  "org.gnome.shell.extensions.dash-to-dock dock-fixed false",
-  "org.gnome.shell.extensions.dash-to-dock dock-position 'BOTTOM'",
-  "org.gnome.shell.extensions.dash-to-dock extend-height false",
-  "org.gnome.shell.extensions.dash-to-dock intellihide true",
-  "org.gnome.shell.extensions.dash-to-dock show-mounts false",
-  "org.gnome.shell.extensions.pop-cosmic clock-alignment 'CENTER'",
-  "org.gnome.shell.extensions.pop-cosmic overlay-key-action 'LAUNCHER'",
-  "org.gnome.shell.extensions.pop-cosmic show-applications-button false",
-  "org.gnome.shell.extensions.pop-cosmic show-workspaces-button false"
+"msc.gnome_favourites": [
+  "audacity",
+  "codium",
+  "deadbeef",
+  "firefox",
+  "gnome-control-center",
+  "gnome-terminal",
+  "libreoffice writer",
+  "nautilus",
+  "repoman"
 ]
 ```
 
 </td>
-<td>sets GNOME GSettings provided as a comma-separated array of individual settings. The relevant key/value pairs can be obtained using tools like GNOME's native <a href="https://help.gnome.org/admin/system-admin-guide/stable/gsettings-browse.html.en">GSettings</a> or <a href="https://apps.gnome.org/DconfEditor/">DConf-Editor</a>. Please note the use of escaped characters (e.g., <code>\"</code>) (default=<b>nul</b>).</td>
+<td>pins user's favourite packages provided as a comma-separated array of package names (as found under <code>"pkg.portables"</code> or <code>"pkg.installers"</code>) to dock (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
 
 ```json
-"msc.ms_fonts": "0"
+"msc.gnome_settings": {
+  "button_layout": "close",
+  "button_position": "right",
+  "capslock_as_extra_escape": 0,
+  "centre_windows_on_open": 0,
+  "check_alive_timeout": 5000,
+  "compose_key": "sclk",
+  "font_scaling_factor": "1.0",
+  "font_terminal": "Fira Mono 12",
+  "font_ui": "Fira Sans Semi-Light 10",
+  "keyboard_languages": "us,fr,it",
+  "launch_browser": "<Super>b",
+  "launch_files": "<Super>f",
+  "launch_settings": "<Primary><Shift>s",
+  "launch_terminal": "<Super>t",
+  "set_wallpaper": "/path/to/my/fav/wallpaper.jpeg",
+  "show_seconds": 1,
+  "show_weekdays": 1,
+  "switch_workspace_down": "<Primary><Super>bracketleft",
+  "switch_workspace_up": "<Primary><Super>bracketright",
+  "windows_close": "<Alt>q",
+  "windows_maximise": "<Super>M",
+  "windows_minimise": "<Super>Z"
+}
+```
+
+</td>
+<td>provides an option to quickly and effectively set GNOME settings without dealing with the GSettings interface. For the list of options and syntax, please consult <code>man 7 xkeyboard-config</code>. If specified path(s) point to drive(s) to be mounted automatically upon system launch (see: <code>msc.automount_drives</code>), please make sure to indicate their pre-mount path(s).</td>
+</tr>
+<tr>
+<td>
+
+```json
+"msc.ms_fonts": 0
 ```
 
 </td>
@@ -586,7 +579,7 @@ This section specifies miscellaneous operations. Currently, it covers only those
 <td>
 
 ```json
-"msc.set_geary": "0"
+"msc.set_geary": 0
 ```
 
 </td>
@@ -596,17 +589,17 @@ This section specifies miscellaneous operations. Currently, it covers only those
 <td>
 
 ```json
-"msc.volume_overamplify": "1"
+"msc.volume_overamplify": 0
 ```
 
 </td>
-<td>sets the system volume to over-amplification mode disabled by default (default=<b>1</b>).</td>
+<td>sets the system volume to over-amplification mode disabled by default (default=<b>0</b>).</td>
 </tr>
 <tr>
 <td>
 
 ```json
-"msc.wallpaper_on": "0"
+"msc.wallpaper_on": 0
 ```
 
 </td>
@@ -620,7 +613,7 @@ This section specifies miscellaneous operations. Currently, it covers only those
 ```
 
 </td>
-<td>sets the source directory for wallpapers (default=<b>$HOME/Pictures/Wallpapers</b>).</td>
+<td>sets the source directory for wallpapers (default=<b>nul</b>).</td>
 </tr>
 <tr>
 <td>
@@ -636,7 +629,7 @@ This section specifies miscellaneous operations. Currently, it covers only those
 <td>
 
 ```json
-"msc.week_starts_on_monday": "0"
+"msc.week_starts_on_monday": 0
 ```
 
 </td>
@@ -650,19 +643,19 @@ In addition to customising the [configuration file](#2-setup-the-json-configurat
 
 #### Directory `CONFIGS`
 
-Contains all the configuration files for your [installable packages](#section-packages). The contents of the directory will be copied directly to your `$HOME`, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGS`.
+A place to store all the configuration files for your [installable packages](#section-packages). The contents of the directory will be copied directly to your `$HOME`, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGS`.
 
 #### Directory `CONFIGSP`
 
-Contains all the configuration files for your [portable packages](#section-packages). The contents of the directory will be copied directly to the location with your portables, as necessary, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGSP`.
+A place to store all the configuration files for your [portable packages](#section-packages). The contents of the directory will be copied directly to the location with your portables, as necessary, with no additional operations applied to the files or directories contained within. Therefore, please be careful about what you place in `CONFIGSP`.
 
 #### Directory `DOTFILES`
 
-Contains all your [.dotfiles](https://wiki.archlinux.org/title/Dotfiles). The files will be copied directly to your `$HOME` directory as well.
+A place to store all your [.dotfiles](https://wiki.archlinux.org/title/Dotfiles). The files will be copied directly to your `$HOME` directory as well.
 
 #### Directory `FIREFOX`
 
-Contains all the files to be copied to your Firefox profile directory, which is typically located at `~/.mozilla/firefox/<your_profile_directory>`. E.g., customs CSS stylesheets, [user-overrides.js](https://github.com/arkenfox/user.js/wiki), [custom search engines](https://addons.mozilla.org/en-US/firefox/addon/mozlz4-edit/), SQL databases, etc.
+A place to store all the files to be copied to your Firefox profile directory, which is typically located at `~/.mozilla/firefox/<your_profile_directory>`. E.g., customs CSS stylesheets, [user-overrides.js](https://github.com/arkenfox/user.js/wiki), [custom search engines](https://addons.mozilla.org/en-US/firefox/addon/mozlz4-edit/), SQL databases, etc.
 
 #### Directory `ICONS`
 
@@ -674,14 +667,15 @@ Contains all the launcher (*.desktop) files for packages shipped with POPPI. The
 
 #### Directory `[LIBREOFFICE]`*
 
-This is an optional directory to hold all your downloaded [LibreOffice] extensions. It will be created by POPPI, if the relevant option is selected in [configuration file](#2-setup-the-json-configuration-file-configurepop).
+This is an optional directory to hold all your downloaded [LibreOffice] extensions and will be created by POPPI, if the relevant option is selected in [configuration file](#2-setup-the-json-configuration-file-configurepop).
 
 #### Directory `MISC`
 
-Currently, this directory contains the following three files:
+Currently, this directory contains the following files:
 
 * `popos.png` - default avatar, if a custom one is not provided by the user.
 * `poppi.desktop` - a launcher file to ensure POPPI's autostart after a successful system update requiring reboot.
+* `schema.json` - a JSON schema to validate the user configuration file.
 * `templates.tar.gz` - an archive with a set of template files for LibreOffice and the default text editor, selectable from a context menu upon right-clicking the mouse in GNOME Nautilus/Files. The archive will be extracted to `$HOME/Templates`.
 
 
@@ -691,7 +685,7 @@ Always run the script as **user**.
 
 ```console
   chmod +x ./poppi.sh
-  ./poppi.sh -[abcdfghprvx] [CONFIGURATION_FILE]
+  ./poppi.sh -[abcdfghipvx] [CONFIGURATION_FILE]
 
   Options:
   -a, --all                 Download, install and set everything
@@ -701,8 +695,8 @@ Always run the script as **user**.
   -f, --set-firefox         Configure options for Firefox
   -g, --set-gsettings       Set GNOME GSettings
   -h, --help                Display this help message
+  -i, --set-installers      Install/update non-portable programs
   -p, --set-portables       Install/update portable programs
-  -r, --set-repos           Install/update non-portable programs
   -v, --version             Display version info
   -x, --gnome-extensions    Get and enable GNOME extensions
 ```
